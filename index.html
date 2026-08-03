@@ -54,9 +54,23 @@
   </div>
   <div id="adminPanel" class="hidden">
     <div class="admin-session"><span id="adminUserEmail"></span><button id="logoutAdmin" class="secondary">登出</button></div>
-    <nav class="tabs"><button class="tab active" data-tab="orders">訂單</button><button class="tab" data-tab="products">商品</button><button class="tab" data-tab="settings">設定</button></nav>
+    <nav class="tabs"><button class="tab active" data-tab="orders">訂單</button><button class="tab" data-tab="products">商品</button><button class="tab owner-only" data-tab="staff">員工</button><button class="tab" data-tab="settings">設定</button></nav>
     <section id="ordersPanel" class="panel"><div id="stats" class="stats"></div><div class="toolbar"><select id="statusFilter"><option value="all">全部狀態</option><option>未取</option><option>等待報價</option><option>已確認</option><option>已取</option><option>已取消</option></select><input id="orderSearch" placeholder="搜尋姓名、電話、編號"><button id="exportOrders" class="secondary">匯出 CSV</button></div><div id="orderList"></div></section>
     <section id="productsPanel" class="panel hidden"><div class="panel-card"><h3>新增商品</h3><div class="form-grid admin-form"><label>商品名稱<input id="newName"></label><label>單位<input id="newUnit" placeholder="斤、箱、顆"></label><label>價格<input id="newPrice" type="number" min="0"></label><label>庫存<input id="newStock" type="number" min="0"></label><label>圖示<input id="newEmoji" maxlength="4" placeholder="🥭"></label><label>商品說明<input id="newDescription"></label></div><button id="addProduct" class="primary compact">新增商品</button></div><div id="productAdminList"></div></section>
+    <section id="staffPanel" class="panel hidden">
+      <div class="panel-card">
+        <div class="section-head compact-head"><div><h3>員工管理</h3><p class="helper">每位夥伴使用自己的 Email 登入。新增前，請先到 Supabase Authentication → Users 建立該帳號。</p></div><span id="staffRoleBadge" class="badge"></span></div>
+        <div class="form-grid admin-form">
+          <label>員工姓名<input id="staffName" placeholder="例如：小編安安"></label>
+          <label>登入 Email<input id="staffEmail" type="email" placeholder="需與 Supabase 帳號相同"></label>
+          <label>權限<select id="staffRole"><option value="manager">管理員</option><option value="order_staff">訂單人員</option><option value="owner">老闆</option></select></label>
+          <label>狀態<select id="staffActive"><option value="true">啟用</option><option value="false">停用</option></select></label>
+        </div>
+        <button id="saveStaff" class="primary compact">新增／更新員工</button>
+        <p id="staffMessage" class="form-message"></p>
+      </div>
+      <div id="staffList" class="staff-list"></div>
+    </section>
     <section id="settingsPanel" class="panel hidden"><div class="panel-card settings-grid"><label>攤位位置<input id="settingLocation"></label><label>營業時間<input id="settingHours"></label><label>預約狀態<select id="settingOpen"><option value="true">開放預約</option><option value="false">暫停預約</option></select></label><button id="saveSettings" class="primary compact">儲存設定</button></div></section>
   </div>
 </dialog>
