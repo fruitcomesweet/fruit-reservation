@@ -98,21 +98,74 @@ function renderStaff(){
  document.querySelectorAll('[data-staff-role]').forEach(el=>el.onchange=()=>updateStaffCard(el.dataset.staffRole));
  document.querySelectorAll('[data-staff-toggle]').forEach(el=>el.onclick=()=>toggleStaff(el.dataset.staffToggle,el.dataset.active!=='true'));
 }
-async function saveStaff(){
- if(currentStaff?.role!=='owner')return alert('只有老闆可以管理員工。');
- const email=$('staffEmail').value.trim().toLowerCase(),display_name=$('staffName').value.trim(),role=$('staffRole').value,is_active=$('staffActive').value==='true';
- $('staffMessage').textContent='';
- if(!email||!display_name)return $('staffMessage').textContent='請填寫姓名與 Email。';
- const r=await db.rpc('upsert_staff_member',{p_email:email,p_display_name:display_name,p_role:role,p_is_active:is_active});
- if(r.error){$('staffMessage').textContent=r.error.message.includes('找不到')?'找不到這個 Supabase 登入帳號，請先在 Authentication → Users 建立帳號。':r.error.message;return;}
- ['staffEmail','staffName'].forEach(id=>$(id).value='');$('staffMessage').textContent='員工資料已儲存。';await refreshStaff();renderStaff();
-}
-async function updateStaffCard(userId){
- const m=staffMembers.find(x=>x.user_id===userId);if(!m)return;
- const name=document.querySelector(`[data-staff-name="${userId}"]`).value.trim();
- const role=document.querySelector(`[data-staff-role="${userId}"]`).value;
- const r=await db.rpc('update_staff_member',{p_user_id:userId,p_display_name:name,p_role:role,p_is_active:m.is_active});
- if(r.error)return alert(r.error.message);await refreshStaff();renderStaff();
+async function saveStaff() {
+  if (currentStaff?.role !== 'owner') {
+    return alert('只有老闆可以管理員工。');
+  }
+
+  const email = $('staffEmail').value.trim().toLowerCase();
+  const display_name = $('staffName').value.trim();
+  const role = $('staffRole').value;
+  const is_active = $('staffActive').value === 'true';
+
+  $('staffMessage').textContent = '';
+
+  if (!email || !display_name) {
+    $('staffMessage').textContent = '請填寫姓名與 Email。';
+    return;
+  }
+
+  $('staffMessage').textContent = '正在建立員工帳號…';
+
+  try {
+    const { data, error } = await db.functions.invoke('invite-staff', {
+      body: {
+        email,
+        display_name,
+        role,
+        is_active
+      }
+    });
+
+    if (error) {
+      let message = error.message || '員工帳號建立失敗。';
+
+      try {
+        const errorBody = await error.context.json();
+        message = errorBody?.error || message;
+      } catch (_) {
+        // 無法解析伺服器錯誤時，保留原本訊息
+      }
+
+      $('staffMessage').textContent = message;
+      return;
+    }
+
+    if (!data?.success) {
+      $('staffMessage').textContent =
+        data?.error || '員工帳號建立失敗。';
+      return;
+    }
+
+    $('staffEmail').value = '';
+    $('staffName').value = '';
+
+    const temporaryPassword = data.temporary_password;
+
+    $('staffMessage').textContent = temporaryPassword
+      ? `員工帳號建立成功。暫時密碼：${temporaryPassword}，請先複製並交給員工。`
+      : '員工帳號建立成功。';
+
+    await refreshStaff();
+    renderStaff();
+  } catch (error) {
+    console.error(error);
+
+    $('staffMessage').textContent =
+      error instanceof Error
+        ? error.message
+        : '建立員工時發生未知錯誤。';
+  }
 }
 async function toggleStaff(userId,isActive){
  const m=staffMembers.find(x=>x.user_id===userId);if(!m)return;

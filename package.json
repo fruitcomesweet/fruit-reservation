@@ -1,0 +1,24 @@
+{
+  "name": "fruit-reservation",
+  "version": "1.0.0",
+  "description": "果來好甜水果預約系統",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fruitcomesweet/fruit-reservation.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/fruitcomesweet/fruit-reservation/issues"
+  },
+  "homepage": "https://github.com/fruitcomesweet/fruit-reservation#readme",
+  "devDependencies": {
+    "supabase": "^2.111.0"
+  }
+}
