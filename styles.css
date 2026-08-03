@@ -4,3 +4,103 @@
 
 /* 員工管理 */
 .compact-head{align-items:flex-start;margin-bottom:12px}.staff-list{display:grid;gap:12px;margin-top:14px}.staff-card{border:1px solid var(--line);border-radius:18px;padding:16px;background:#fff}.staff-card-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.staff-email{font-size:13px;color:var(--muted);margin-top:4px;word-break:break-all}.staff-tags{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}.role-chip,.active-chip{font-size:12px;font-weight:900;border-radius:999px;padding:6px 10px;background:#fff0df;color:var(--orange-dark)}.active-chip.on{background:#e8f4e4;color:#47733e}.active-chip.off{background:#eee;color:#777}.staff-actions{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-top:14px}.staff-actions select,.staff-actions input{margin:0}.staff-actions button{white-space:nowrap}.hidden-by-role{display:none!important}@media(max-width:700px){.staff-actions{grid-template-columns:1fr}.staff-tags{justify-content:flex-start}.staff-card-top{flex-direction:column}}
+/* 修改密碼視窗 */
+.password-dialog {
+  width: min(92vw, 480px);
+  border: 0;
+  border-radius: 24px;
+  padding: 28px;
+  box-shadow: 0 24px 70px rgba(71, 48, 31, 0.25);
+}
+
+.password-dialog::backdrop {
+  background: rgba(45, 35, 28, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.password-dialog .admin-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.password-dialog .admin-head h2 {
+  margin: 4px 0 0;
+  font-size: 28px;
+}
+
+.password-dialog .eyebrow {
+  margin: 0;
+  color: #cc6b42;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+}
+
+.password-dialog form {
+  display: grid;
+  gap: 16px;
+}
+
+.password-dialog label {
+  display: grid;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.password-dialog input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border: 1px solid #ded8d1;
+  border-radius: 14px;
+  background: #fffdf9;
+  font: inherit;
+}
+
+.password-dialog input:focus {
+  outline: 3px solid rgba(232, 119, 62, 0.18);
+  border-color: #e8773e;
+}
+
+.password-dialog .icon-button {
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  background: #f4efe9;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+.password-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+#passwordMessage {
+  min-height: 22px;
+  margin: 0;
+  color: #b44c36;
+  font-weight: 700;
+}
+
+@media (max-width: 520px) {
+  .password-dialog {
+    width: calc(100vw - 28px);
+    padding: 22px 18px;
+    border-radius: 20px;
+  }
+
+  .password-actions {
+    flex-direction: column-reverse;
+  }
+
+  .password-actions button {
+    width: 100%;
+  }
+}
