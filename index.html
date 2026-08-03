@@ -45,12 +45,19 @@
 <dialog id="successDialog" class="dialog"><div id="successContent"></div><button id="closeSuccess" class="primary">完成</button></dialog>
 <dialog id="adminDialog" class="dialog admin-dialog">
   <div class="admin-head"><div><p class="eyebrow">STORE DASHBOARD</p><h2>果來店家後台</h2></div><button id="closeAdmin" class="icon">✕</button></div>
-  <div id="adminLock" class="admin-lock"><p>輸入管理密碼</p><div class="inline"><input id="adminPassword" type="password" placeholder="管理密碼"><button id="unlockAdmin" class="secondary">進入</button></div><p class="helper">正式上線後，建議改用 Supabase 登入保護後台。</p></div>
+  <div id="adminLock" class="admin-lock">
+    <p><strong>賣家登入</strong></p>
+    <label>Email<input id="adminEmail" type="email" autocomplete="username" placeholder="Supabase 賣家帳號"></label>
+    <label>密碼<input id="adminPassword" type="password" autocomplete="current-password" placeholder="登入密碼"></label>
+    <button id="unlockAdmin" class="primary">登入後台</button>
+    <p id="loginMessage" class="form-message"></p>
+  </div>
   <div id="adminPanel" class="hidden">
+    <div class="admin-session"><span id="adminUserEmail"></span><button id="logoutAdmin" class="secondary">登出</button></div>
     <nav class="tabs"><button class="tab active" data-tab="orders">訂單</button><button class="tab" data-tab="products">商品</button><button class="tab" data-tab="settings">設定</button></nav>
     <section id="ordersPanel" class="panel"><div id="stats" class="stats"></div><div class="toolbar"><select id="statusFilter"><option value="all">全部狀態</option><option>未取</option><option>等待報價</option><option>已確認</option><option>已取</option><option>已取消</option></select><input id="orderSearch" placeholder="搜尋姓名、電話、編號"><button id="exportOrders" class="secondary">匯出 CSV</button></div><div id="orderList"></div></section>
     <section id="productsPanel" class="panel hidden"><div class="panel-card"><h3>新增商品</h3><div class="form-grid admin-form"><label>商品名稱<input id="newName"></label><label>單位<input id="newUnit" placeholder="斤、箱、顆"></label><label>價格<input id="newPrice" type="number" min="0"></label><label>庫存<input id="newStock" type="number" min="0"></label><label>圖示<input id="newEmoji" maxlength="4" placeholder="🥭"></label><label>商品說明<input id="newDescription"></label></div><button id="addProduct" class="primary compact">新增商品</button></div><div id="productAdminList"></div></section>
-    <section id="settingsPanel" class="panel hidden"><div class="panel-card settings-grid"><label>攤位位置<input id="settingLocation"></label><label>營業時間<input id="settingHours"></label><label>預約狀態<select id="settingOpen"><option value="true">開放預約</option><option value="false">暫停預約</option></select></label><label>後台密碼<input id="settingPassword" type="password"></label><button id="saveSettings" class="primary compact">儲存設定</button></div></section>
+    <section id="settingsPanel" class="panel hidden"><div class="panel-card settings-grid"><label>攤位位置<input id="settingLocation"></label><label>營業時間<input id="settingHours"></label><label>預約狀態<select id="settingOpen"><option value="true">開放預約</option><option value="false">暫停預約</option></select></label><button id="saveSettings" class="primary compact">儲存設定</button></div></section>
   </div>
 </dialog>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

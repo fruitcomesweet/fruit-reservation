@@ -1,5 +1,4 @@
 window.FRUIT_CONFIG = {
-  SUPABASE_URL: "",
-  SUPABASE_ANON_KEY: "",
-  ADMIN_PASSWORD: "fruit123"
+  SUPABASE_URL: "https://uzxnnlxzayvomcnvrhld.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_QSboPey7YBcGkomeuyyEsA_atvJbF6k"
 };
