@@ -28,3 +28,42 @@
 @media (max-width:640px){
   .manual-pickup{grid-template-columns:1fr}
 }
+/* 前台查詢我的訂單 */
+.order-lookup-box{
+  margin-top:24px;
+  padding-top:22px;
+  border-top:1px solid #eadfd8;
+}
+
+.order-lookup-box h3{
+  margin:0 0 8px;
+}
+
+.order-lookup-row{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:10px;
+  margin-top:14px;
+}
+
+.lookup-order-card{
+  margin-top:16px;
+  padding:18px;
+  background:#fffaf6;
+  border:1px solid #eadfd8;
+  border-radius:16px;
+}
+
+.lookup-order-card > div{
+  margin-top:8px;
+}
+
+@media (max-width:640px){
+  .order-lookup-row{
+    grid-template-columns:1fr;
+  }
+
+  .order-lookup-row button{
+    width:100%;
+  }
+}

@@ -40,7 +40,27 @@
       <label class="consent"><input id="agree" type="checkbox" required><span>我確認會在今日營業時間內取貨，若臨時無法前往會主動告知。</span></label>
       <button class="primary" type="submit">送出預約保留</button><p id="formMessage" class="form-message"></p>
     </form>
-  </section>
+<div class="order-lookup-box">
+  <h3>查詢我的訂單</h3>
+  <p class="helper">輸入下單時的手機號碼，即可查詢今天的訂單與 QR Code。</p>
+
+  <div class="order-lookup-row">
+    <input
+      id="lookupPhone"
+      inputmode="numeric"
+      maxlength="10"
+      placeholder="09xxxxxxxx"
+    >
+    <button id="lookupMyOrders" class="secondary" type="button">
+      查詢今日訂單
+    </button>
+  </div>
+
+  <p id="lookupMessage" class="form-message"></p>
+  <div id="lookupResults"></div>
+</div>
+
+</section>
 </main>
 <dialog id="successDialog" class="dialog"><div id="successContent"></div><button id="closeSuccess" class="primary">完成</button></dialog>
 <dialog id="adminDialog" class="dialog admin-dialog">

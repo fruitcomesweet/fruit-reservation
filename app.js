@@ -35,11 +35,85 @@ function applySettings(){$('storeLocation').textContent=settings.location;$('sto
 function renderProducts(){const visible=products.filter(p=>p.active);$('emptyProducts').classList.toggle('hidden',visible.length);$('productGrid').innerHTML=visible.map(p=>{const q=cart[p.id]||0,sold=p.stock<=0;return `<article class="product ${sold?'sold':''}"><div class="product-icon">${esc(p.emoji||'🍎')}</div><h3>${esc(p.name)}</h3><div class="product-desc">${esc(p.description||'')}</div><div class="meta"><span class="price">${money(p.price)} / ${esc(p.unit)}</span><span class="stock">${sold?'已售完':`剩 ${p.stock} ${esc(p.unit)}`}</span></div><div class="qty"><button data-dec="${p.id}" ${sold?'disabled':''}>−</button><strong>${q}</strong><button data-inc="${p.id}" ${sold?'disabled':''}>＋</button></div></article>`}).join('');document.querySelectorAll('[data-inc]').forEach(b=>b.onclick=()=>changeQty(b.dataset.inc,1));document.querySelectorAll('[data-dec]').forEach(b=>b.onclick=()=>changeQty(b.dataset.dec,-1));}
 function changeQty(id,d){const p=products.find(x=>String(x.id)===String(id));const n=Math.max(0,Math.min(p.stock,(cart[id]||0)+d));if(n)cart[id]=n;else delete cart[id];renderProducts();renderCart()}
 function renderCart(){const lines=Object.entries(cart).map(([id,q])=>({p:products.find(x=>String(x.id)===String(id)),q})).filter(x=>x.p);const total=lines.reduce((s,x)=>s+x.p.price*x.q,0);$('cartCount').textContent=lines.length?`${lines.reduce((s,x)=>s+x.q,0)} 件商品`:'尚未選商品';$('cartSummary').innerHTML=lines.length?lines.map(x=>`<div class="cart-line"><span>${esc(x.p.emoji)} ${esc(x.p.name)} × ${x.q}</span><strong>${money(x.p.price*x.q)}</strong></div>`).join('')+`<div class="cart-line cart-total"><span>商品小計</span><span>${money(total)}</span></div>`:'請先選擇上方商品。'}
-function bind(){document.querySelectorAll('input[name="method"]').forEach(r=>r.onchange=()=>{$('deliveryFields').classList.toggle('hidden',!(r.checked&&r.value==='Lalamove配送'))});$('reservationForm').onsubmit=submitOrder;$('openAdmin').onclick=async()=>{$('adminDialog').showModal();if(ONLINE){const {data}=await db.auth.getSession();adminSession=data.session||null;updateAdminView();if(adminSession){await refreshAdminOrders();renderAdmin();}}};$('closeAdmin').onclick=()=>$('adminDialog').close();$('closeSuccess').onclick=()=>$('successDialog').close();$('unlockAdmin').onclick=unlock;$('logoutAdmin').onclick=logout;document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>switchTab(t.dataset.tab));$('statusFilter').onchange=renderOrders;$('orderSearch').oninput=renderOrders;$('exportOrders').onclick=exportCSV;$('addProduct').onclick=addProduct;$('saveSettings').onclick=saveSettings;$('saveStaff').onclick=saveStaff;$('startQrScanner').onclick=startQrScanner;$('stopQrScanner').onclick=stopQrScanner;$('lookupPickupCode').onclick=()=>lookupPickupCode($('manualPickupCode').value);$('manualPickupCode').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();lookupPickupCode(e.currentTarget.value)}}}
+function bind(){
+ const lookupBtn = $('lookupMyOrders');
+if (lookupBtn) lookupBtn.onclick = lookupMyOrders; 
+document.querySelectorAll('input[name="method"]').forEach(r=>r.onchange=()=>{$('deliveryFields').classList.toggle('hidden',!(r.checked&&r.value==='Lalamove配送'))});$('reservationForm').onsubmit=submitOrder;$('openAdmin').onclick=async()=>{$('adminDialog').showModal();if(ONLINE){const {data}=await db.auth.getSession();adminSession=data.session||null;updateAdminView();if(adminSession){await refreshAdminOrders();renderAdmin();}}};$('closeAdmin').onclick=()=>$('adminDialog').close();$('closeSuccess').onclick=()=>$('successDialog').close();$('unlockAdmin').onclick=unlock;$('logoutAdmin').onclick=logout;document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>switchTab(t.dataset.tab));$('statusFilter').onchange=renderOrders;$('orderSearch').oninput=renderOrders;$('exportOrders').onclick=exportCSV;$('addProduct').onclick=addProduct;$('saveSettings').onclick=saveSettings;$('saveStaff').onclick=saveStaff;$('startQrScanner').onclick=startQrScanner;$('stopQrScanner').onclick=stopQrScanner;$('lookupPickupCode').onclick=()=>lookupPickupCode($('manualPickupCode').value);$('manualPickupCode').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();lookupPickupCode(e.currentTarget.value)}}}
 async function submitOrder(e){e.preventDefault();$('formMessage').textContent='';if(!settings.open)return fail('目前暫停預約。');const entries=Object.entries(cart);if(!entries.length)return fail('請先選擇至少一項商品。');const name=$('name').value.trim(),phone=$('phone').value.trim(),pickup=$('pickupTime').value,method=document.querySelector('input[name="method"]:checked').value,address=$('address').value.trim();if(!name||!/^09\d{8}$/.test(phone)||!pickup||!$('agree').checked)return fail('請確認姓名、10碼手機、取貨時間與同意事項。');if(method==='Lalamove配送'&&!address)return fail('請填寫配送地址。');const items=entries.map(([id,qty])=>{const p=products.find(x=>String(x.id)===String(id));return{product_id:p.id,name:p.name,unit:p.unit,price:p.price,qty,emoji:p.emoji}});for(const i of items){const p=products.find(x=>String(x.id)===String(i.product_id));if(!p||i.qty>p.stock)return fail(`${i.name} 庫存不足。`)}const total=items.reduce((s,i)=>s+i.price*i.qty,0),status=method==='Lalamove配送'?'等待報價':'未取';let order;
  try{if(ONLINE){const rpc=await db.rpc('create_reservation',{p_name:name,p_phone:phone,p_line_name:$('lineName').value.trim(),p_pickup_time:pickup,p_method:method,p_address:address,p_note:$('note').value.trim(),p_status:status,p_items:items});if(rpc.error)throw rpc.error;order={...rpc.data,items}}else{const id=`GL${new Date().toISOString().slice(5,10).replace('-','')}-${String(orders.length+1).padStart(3,'0')}`;order={id,created_at:new Date().toISOString(),name,phone,line_name:$('lineName').value.trim(),pickup_time:pickup,method,address,note:$('note').value.trim(),status,total,items};orders.unshift(order);if(method==='現場自取')items.forEach(i=>products.find(p=>String(p.id)===String(i.product_id)).stock-=i.qty);save(LS.orders,orders);save(LS.products,products)}}catch(err){console.error(err);return fail('送出失敗，請稍後再試或聯絡小編。')}
  showSuccess(order);cart={};e.target.reset();document.querySelector('input[value="現場自取"]').checked=true;$('deliveryFields').classList.add('hidden');await refreshAll();}
-function fail(t){$('formMessage').textContent=t}
+function fail(t){  $('formMessage').textContent=t}
+
+  async function lookupMyOrders(){
+  const phone = ($('lookupPhone')?.value || '').replace(/\D/g, '');
+  const message = $('lookupMessage');
+  const results = $('lookupResults');
+
+  message.textContent = '';
+  results.innerHTML = '';
+
+  if (phone.length !== 10 || !phone.startsWith('09')) {
+    message.textContent = '請輸入正確的 10 碼手機號碼';
+    return;
+  }
+
+  try {
+    const { data, error } = await db.rpc('lookup_today_orders_by_phone', {
+      p_phone: phone
+    });
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      message.textContent = '今天查不到這個手機號碼的訂單';
+      return;
+    }
+
+    results.innerHTML = data.map((order, index) => `
+  <div class="lookup-order-card">
+    <strong>${order.name || '果來好甜顧客'}</strong>
+    <div>訂單編號：${order.id || ''}</div>
+    <div>取貨碼：<strong>${order.pickup_code || ''}</strong></div>
+    <div>${order.pickup_time || ''}｜${order.method || ''}</div>
+    <div>金額：$${Number(order.total || 0).toLocaleString()}</div>
+
+    <div
+      id="lookupQr-${index}"
+      class="customer-qr"
+      style="margin-top:12px;"
+    ></div>
+
+    ${
+      order.status === '已取'
+        ? `<div class="pickup-done">
+             ✅ 此訂單已完成取貨
+             ${order.picked_up_at
+               ? `<br>${new Date(order.picked_up_at).toLocaleString('zh-TW')}`
+               : ''}
+           </div>`
+        : `<p class="helper">取貨時請出示此 QR Code 給店員掃描。</p>`
+    }
+  </div>
+`).join('');
+
+data.forEach((order, index) => {
+  const qrTarget = document.getElementById(`lookupQr-${index}`);
+
+  if (window.QRCode && qrTarget) {
+    new QRCode(qrTarget, {
+      text: String(order.pickup_code || order.id),
+      width: 180,
+      height: 180,
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  }
+});
+
+  } catch (err) {
+    console.error(err);
+    message.textContent = '查詢失敗，請稍後再試';
+  }
+}
 function showSuccess(o){
  const pickupCode=o.pickup_code||o.id;
  $('successContent').innerHTML=`<div style="font-size:48px;text-align:center">🍊</div><h2 style="text-align:center">已收到預約</h2><p style="text-align:center">請截圖保存 QR Code，取貨時出示給店員</p><div id="customerQrCode" class="customer-qr"></div><div class="success-number">${esc(pickupCode)}</div>${o.items.map(i=>`<div class="cart-line"><span>${esc(i.emoji)} ${esc(i.name)} × ${i.qty}</span><strong>${money(i.price*i.qty)}</strong></div>`).join('')}<div class="cart-line cart-total"><span>商品小計</span><span>${money(o.total)}</span></div><div class="cart-line"><span>取貨</span><span>${esc(o.pickup_time||o.pickup)}／${esc(o.method)}</span></div><div class="cart-line"><span>狀態</span><span>${esc(o.status)}</span></div><p class="helper">QR Code 無法掃描時，也可以提供上方取貨碼。</p>`;
