@@ -3,7 +3,7 @@ const ONLINE=Boolean(CFG.SUPABASE_URL&&CFG.SUPABASE_ANON_KEY&&window.supabase);
 const db=ONLINE?window.supabase.createClient(CFG.SUPABASE_URL,CFG.SUPABASE_ANON_KEY):null;
 const LS={products:'fruitFormal_products',orders:'fruitFormal_orders',settings:'fruitFormal_settings'};
 const defaults={products:[{id:'mango',name:'金煌芒果',unit:'斤',price:33,stock:60,emoji:'🥭',description:'特A級，保留需最少3斤',active:true,sort_order:1},{id:'durian',name:'赤皇榴槤',unit:'顆',price:499,stock:20,emoji:'🌰',description:'明星牌特A果，單顆販售',active:true,sort_order:2},{id:'dragon',name:'白肉火龍果',unit:'斤',price:39,stock:90,emoji:'🐉',description:'清甜爽口，限量供應',active:true,sort_order:3}],settings:{location:'📍 板橋重慶黃昏市場',hours:'取貨時間 14:00–19:30｜商品限當日取貨',open:true}};
-let products=[],orders=[],settings={},cart={},adminSession=null,currentStaff=null,staffMembers=[];
+let products=[],orders=[],settings={},cart={},adminSession=null,currentStaff=null,staffMembers=[],qrScanner=null,currentPickupOrder=null;
 const $=id=>document.getElementById(id),money=n=>`$${Number(n).toLocaleString('zh-TW')}`,clone=x=>JSON.parse(JSON.stringify(x));
 const load=(k,f)=>{try{return JSON.parse(localStorage.getItem(k))??clone(f)}catch{return clone(f)}};
 const save=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
@@ -35,12 +35,117 @@ function applySettings(){$('storeLocation').textContent=settings.location;$('sto
 function renderProducts(){const visible=products.filter(p=>p.active);$('emptyProducts').classList.toggle('hidden',visible.length);$('productGrid').innerHTML=visible.map(p=>{const q=cart[p.id]||0,sold=p.stock<=0;return `<article class="product ${sold?'sold':''}"><div class="product-icon">${esc(p.emoji||'🍎')}</div><h3>${esc(p.name)}</h3><div class="product-desc">${esc(p.description||'')}</div><div class="meta"><span class="price">${money(p.price)} / ${esc(p.unit)}</span><span class="stock">${sold?'已售完':`剩 ${p.stock} ${esc(p.unit)}`}</span></div><div class="qty"><button data-dec="${p.id}" ${sold?'disabled':''}>−</button><strong>${q}</strong><button data-inc="${p.id}" ${sold?'disabled':''}>＋</button></div></article>`}).join('');document.querySelectorAll('[data-inc]').forEach(b=>b.onclick=()=>changeQty(b.dataset.inc,1));document.querySelectorAll('[data-dec]').forEach(b=>b.onclick=()=>changeQty(b.dataset.dec,-1));}
 function changeQty(id,d){const p=products.find(x=>String(x.id)===String(id));const n=Math.max(0,Math.min(p.stock,(cart[id]||0)+d));if(n)cart[id]=n;else delete cart[id];renderProducts();renderCart()}
 function renderCart(){const lines=Object.entries(cart).map(([id,q])=>({p:products.find(x=>String(x.id)===String(id)),q})).filter(x=>x.p);const total=lines.reduce((s,x)=>s+x.p.price*x.q,0);$('cartCount').textContent=lines.length?`${lines.reduce((s,x)=>s+x.q,0)} 件商品`:'尚未選商品';$('cartSummary').innerHTML=lines.length?lines.map(x=>`<div class="cart-line"><span>${esc(x.p.emoji)} ${esc(x.p.name)} × ${x.q}</span><strong>${money(x.p.price*x.q)}</strong></div>`).join('')+`<div class="cart-line cart-total"><span>商品小計</span><span>${money(total)}</span></div>`:'請先選擇上方商品。'}
-function bind(){document.querySelectorAll('input[name="method"]').forEach(r=>r.onchange=()=>{$('deliveryFields').classList.toggle('hidden',!(r.checked&&r.value==='Lalamove配送'))});$('reservationForm').onsubmit=submitOrder;$('openAdmin').onclick=async()=>{$('adminDialog').showModal();if(ONLINE){const {data}=await db.auth.getSession();adminSession=data.session||null;updateAdminView();if(adminSession){await refreshAdminOrders();renderAdmin();}}};$('closeAdmin').onclick=()=>$('adminDialog').close();$('closeSuccess').onclick=()=>$('successDialog').close();$('unlockAdmin').onclick=unlock;$('logoutAdmin').onclick=logout;document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>switchTab(t.dataset.tab));$('statusFilter').onchange=renderOrders;$('orderSearch').oninput=renderOrders;$('exportOrders').onclick=exportCSV;$('addProduct').onclick=addProduct;$('saveSettings').onclick=saveSettings;$('saveStaff').onclick=saveStaff}
+function bind(){document.querySelectorAll('input[name="method"]').forEach(r=>r.onchange=()=>{$('deliveryFields').classList.toggle('hidden',!(r.checked&&r.value==='Lalamove配送'))});$('reservationForm').onsubmit=submitOrder;$('openAdmin').onclick=async()=>{$('adminDialog').showModal();if(ONLINE){const {data}=await db.auth.getSession();adminSession=data.session||null;updateAdminView();if(adminSession){await refreshAdminOrders();renderAdmin();}}};$('closeAdmin').onclick=()=>$('adminDialog').close();$('closeSuccess').onclick=()=>$('successDialog').close();$('unlockAdmin').onclick=unlock;$('logoutAdmin').onclick=logout;document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>switchTab(t.dataset.tab));$('statusFilter').onchange=renderOrders;$('orderSearch').oninput=renderOrders;$('exportOrders').onclick=exportCSV;$('addProduct').onclick=addProduct;$('saveSettings').onclick=saveSettings;$('saveStaff').onclick=saveStaff;$('startQrScanner').onclick=startQrScanner;$('stopQrScanner').onclick=stopQrScanner;$('lookupPickupCode').onclick=()=>lookupPickupCode($('manualPickupCode').value);$('manualPickupCode').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();lookupPickupCode(e.currentTarget.value)}}}
 async function submitOrder(e){e.preventDefault();$('formMessage').textContent='';if(!settings.open)return fail('目前暫停預約。');const entries=Object.entries(cart);if(!entries.length)return fail('請先選擇至少一項商品。');const name=$('name').value.trim(),phone=$('phone').value.trim(),pickup=$('pickupTime').value,method=document.querySelector('input[name="method"]:checked').value,address=$('address').value.trim();if(!name||!/^09\d{8}$/.test(phone)||!pickup||!$('agree').checked)return fail('請確認姓名、10碼手機、取貨時間與同意事項。');if(method==='Lalamove配送'&&!address)return fail('請填寫配送地址。');const items=entries.map(([id,qty])=>{const p=products.find(x=>String(x.id)===String(id));return{product_id:p.id,name:p.name,unit:p.unit,price:p.price,qty,emoji:p.emoji}});for(const i of items){const p=products.find(x=>String(x.id)===String(i.product_id));if(!p||i.qty>p.stock)return fail(`${i.name} 庫存不足。`)}const total=items.reduce((s,i)=>s+i.price*i.qty,0),status=method==='Lalamove配送'?'等待報價':'未取';let order;
  try{if(ONLINE){const rpc=await db.rpc('create_reservation',{p_name:name,p_phone:phone,p_line_name:$('lineName').value.trim(),p_pickup_time:pickup,p_method:method,p_address:address,p_note:$('note').value.trim(),p_status:status,p_items:items});if(rpc.error)throw rpc.error;order={...rpc.data,items}}else{const id=`GL${new Date().toISOString().slice(5,10).replace('-','')}-${String(orders.length+1).padStart(3,'0')}`;order={id,created_at:new Date().toISOString(),name,phone,line_name:$('lineName').value.trim(),pickup_time:pickup,method,address,note:$('note').value.trim(),status,total,items};orders.unshift(order);if(method==='現場自取')items.forEach(i=>products.find(p=>String(p.id)===String(i.product_id)).stock-=i.qty);save(LS.orders,orders);save(LS.products,products)}}catch(err){console.error(err);return fail('送出失敗，請稍後再試或聯絡小編。')}
  showSuccess(order);cart={};e.target.reset();document.querySelector('input[value="現場自取"]').checked=true;$('deliveryFields').classList.add('hidden');await refreshAll();}
 function fail(t){$('formMessage').textContent=t}
-function showSuccess(o){$('successContent').innerHTML=`<div style="font-size:48px;text-align:center">🍊</div><h2 style="text-align:center">已收到預約</h2><p style="text-align:center">請截圖保留此畫面</p><div class="success-number">${esc(o.id)}</div>${o.items.map(i=>`<div class="cart-line"><span>${esc(i.emoji)} ${esc(i.name)} × ${i.qty}</span><strong>${money(i.price*i.qty)}</strong></div>`).join('')}<div class="cart-line cart-total"><span>商品小計</span><span>${money(o.total)}</span></div><div class="cart-line"><span>取貨</span><span>${esc(o.pickup_time||o.pickup)}／${esc(o.method)}</span></div><div class="cart-line"><span>狀態</span><span>${esc(o.status)}</span></div><p class="helper">到現場請提供預約編號或手機末三碼。</p>`;$('successDialog').showModal()}
+function showSuccess(o){
+ const pickupCode=o.pickup_code||o.id;
+ $('successContent').innerHTML=`<div style="font-size:48px;text-align:center">🍊</div><h2 style="text-align:center">已收到預約</h2><p style="text-align:center">請截圖保存 QR Code，取貨時出示給店員</p><div id="customerQrCode" class="customer-qr"></div><div class="success-number">${esc(pickupCode)}</div>${o.items.map(i=>`<div class="cart-line"><span>${esc(i.emoji)} ${esc(i.name)} × ${i.qty}</span><strong>${money(i.price*i.qty)}</strong></div>`).join('')}<div class="cart-line cart-total"><span>商品小計</span><span>${money(o.total)}</span></div><div class="cart-line"><span>取貨</span><span>${esc(o.pickup_time||o.pickup)}／${esc(o.method)}</span></div><div class="cart-line"><span>狀態</span><span>${esc(o.status)}</span></div><p class="helper">QR Code 無法掃描時，也可以提供上方取貨碼。</p>`;
+ $('successDialog').showModal();
+ const qrTarget=$('customerQrCode');
+ if(window.QRCode&&qrTarget)new QRCode(qrTarget,{text:String(pickupCode),width:190,height:190,correctLevel:QRCode.CorrectLevel.M});
+}
+
+function normalizePickupCode(value=''){
+ return String(value).trim().toUpperCase().replace(/\s+/g,'');
+}
+async function startQrScanner(){
+ if(!adminSession)return alert('請先登入後台');
+ if(!window.Html5Qrcode){$('pickupMessage').textContent='掃描元件尚未載入，請重新整理網頁。';return;}
+ $('pickupMessage').textContent='';
+ $('qrReader').classList.remove('hidden');
+ $('startQrScanner').classList.add('hidden');
+ $('stopQrScanner').classList.remove('hidden');
+ try{
+  qrScanner=new Html5Qrcode('qrReader');
+  await qrScanner.start(
+   {facingMode:'environment'},
+   {fps:10,qrbox:{width:240,height:240}},
+   async decodedText=>{
+    await stopQrScanner();
+    $('manualPickupCode').value=normalizePickupCode(decodedText);
+    await lookupPickupCode(decodedText);
+   },
+   ()=>{}
+  );
+ }catch(err){
+  console.error(err);
+  $('pickupMessage').textContent='無法開啟相機。請確認瀏覽器已允許相機權限，或改用手動輸入取貨碼。';
+  await stopQrScanner();
+ }
+}
+async function stopQrScanner(){
+ if(qrScanner){
+  try{await qrScanner.stop()}catch(_){}
+  try{await qrScanner.clear()}catch(_){}
+  qrScanner=null;
+ }
+ if($('qrReader'))$('qrReader').classList.add('hidden');
+ if($('startQrScanner'))$('startQrScanner').classList.remove('hidden');
+ if($('stopQrScanner'))$('stopQrScanner').classList.add('hidden');
+}
+async function lookupPickupCode(rawCode){
+ if(!adminSession)return alert('請先登入後台');
+ const code=normalizePickupCode(rawCode);
+ $('pickupMessage').textContent='';
+ $('pickupResult').innerHTML='';
+ currentPickupOrder=null;
+ if(!code){$('pickupMessage').textContent='請掃描 QR Code 或輸入取貨碼。';return;}
+ $('pickupMessage').textContent='正在查詢訂單…';
+ const result=await db.from('orders').select('*,order_items(*)').eq('pickup_code',code).maybeSingle();
+ if(result.error){
+  console.error(result.error);
+  $('pickupMessage').textContent='查詢失敗，請確認 QR 取貨 SQL 已執行。';
+  return;
+ }
+ if(!result.data){
+  $('pickupMessage').textContent='找不到這組取貨碼，請確認畫面是否完整。';
+  return;
+ }
+ currentPickupOrder={...result.data,items:result.data.order_items||[]};
+ $('pickupMessage').textContent='';
+ renderPickupOrder(currentPickupOrder);
+}
+function renderPickupOrder(o){
+ const alreadyPicked=o.status==='已取';
+ $('pickupResult').innerHTML=`<article class="panel-card pickup-order ${alreadyPicked?'picked':''}">
+  <div class="order-top">
+   <div><h3>${esc(o.name)}</h3><div class="order-id">${esc(o.phone)}｜${esc(o.id)}</div></div>
+   <span class="status-badge">${esc(o.status)}</span>
+  </div>
+  <div class="pickup-code-line">取貨碼：<strong>${esc(o.pickup_code||'')}</strong></div>
+  <div class="order-lines">${(o.items||[]).map(i=>`${esc(i.emoji)} ${esc(i.name)} × ${i.qty}`).join('<br>')}</div>
+  <div class="cart-line cart-total"><span>商品小計</span><span>${money(o.total)}</span></div>
+  <div class="order-lines">${esc(o.pickup_time||'')}｜${esc(o.method||'')}${o.note?`<br>備註：${esc(o.note)}`:''}</div>
+  ${alreadyPicked
+    ? `<p class="pickup-done">✅ 此訂單已完成取貨${o.picked_up_at?`<br>${new Date(o.picked_up_at).toLocaleString('zh-TW')}`:''}</p>`
+    : `<button id="confirmPickup" class="primary" type="button">確認已取貨</button>`}
+ </article>`;
+ if(!alreadyPicked)$('confirmPickup').onclick=confirmPickup;
+}
+async function confirmPickup(){
+ if(!currentPickupOrder||!adminSession)return;
+ if(!confirm(`確認「${currentPickupOrder.name}」已領取這筆訂單？`))return;
+ $('confirmPickup').disabled=true;
+ $('confirmPickup').textContent='核銷中…';
+ const statusResult=await db.rpc('update_order_status',{p_order_id:currentPickupOrder.id,p_new_status:'已取'});
+ if(statusResult.error){
+  $('confirmPickup').disabled=false;
+  $('confirmPickup').textContent='確認已取貨';
+  alert(statusResult.error.message);
+  return;
+ }
+ const pickedAt=new Date().toISOString();
+ await db.from('orders').update({picked_up_at:pickedAt,picked_up_by:adminSession.user.id}).eq('id',currentPickupOrder.id);
+ currentPickupOrder.status='已取';
+ currentPickupOrder.picked_up_at=pickedAt;
+ renderPickupOrder(currentPickupOrder);
+ await refreshAdminOrders();
+ renderOrders();
+}
+
 async function unlock(){
  if(!ONLINE)return alert('Supabase 尚未連線，無法登入。');
  const email=$('adminEmail').value.trim(),password=$('adminPassword').value;
@@ -58,7 +163,7 @@ function updateAdminView(){
  $('adminLock').classList.toggle('hidden',logged);$('adminPanel').classList.toggle('hidden',!logged);
  if(logged){$('adminUserEmail').textContent=`${currentStaff?.display_name||''} ${adminSession.user.email||'已登入'}`.trim();$('loginMessage').textContent='';applyRoleUI();}
 }
-function switchTab(tab){if(tab==='staff'&&currentStaff?.role!=='owner')return;document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));['orders','products','staff','settings'].forEach(x=>$(x+'Panel').classList.toggle('hidden',x!==tab));renderAdmin()}
+function switchTab(tab){if(tab==='staff'&&currentStaff?.role!=='owner')return;if(tab!=='pickup')stopQrScanner();document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));['orders','pickup','products','staff','settings'].forEach(x=>$(x+'Panel').classList.toggle('hidden',x!==tab));renderAdmin()}
 function renderAdmin(){renderStats();renderOrders();renderProductAdmin();applySettings();if(currentStaff?.role==='owner')refreshStaff().then(renderStaff)}
 function renderStats(){const revenue=orders.filter(o=>o.status==='已取').reduce((s,o)=>s+Number(o.total),0);$('stats').innerHTML=`<div class="stat"><strong>${orders.length}</strong><span>今日訂單</span></div><div class="stat"><strong>${orders.filter(o=>o.status==='未取').length}</strong><span>尚未取貨</span></div><div class="stat"><strong>${orders.filter(o=>o.status==='等待報價').length}</strong><span>等待報價</span></div><div class="stat"><strong>${money(revenue)}</strong><span>已取營業額</span></div>`}
 function renderOrders(){const f=$('statusFilter').value,q=$('orderSearch').value.trim().toLowerCase(),list=orders.filter(o=>(f==='all'||o.status===f)&&(!q||`${o.id}${o.name}${o.phone}`.toLowerCase().includes(q)));$('orderList').innerHTML=list.length?list.map(o=>`<article class="order-item"><div class="order-top"><div><strong>${esc(o.name)}</strong><div class="order-id">${esc(o.phone)}｜${esc(o.id)}</div></div><span class="status-badge">${esc(o.status)}</span></div><div class="order-lines">${(o.items||[]).map(i=>`${esc(i.emoji)} ${esc(i.name)} × ${i.qty}`).join('、')}<br>${esc(o.pickup_time||o.pickup)}｜${esc(o.method)}｜${money(o.total)}${o.note?`<br>備註：${esc(o.note)}`:''}</div><div class="order-actions">${['未取','等待報價','已確認','已取','已取消'].map(s=>`<button data-order="${o.id}" data-status="${s}">${s}</button>`).join('')}</div></article>`).join(''):'<div class="empty">目前沒有符合條件的訂單。</div>';document.querySelectorAll('[data-order]').forEach(b=>b.onclick=()=>updateOrder(b.dataset.order,b.dataset.status));renderStats()}

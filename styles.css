@@ -4,3 +4,27 @@
 
 /* 員工管理 */
 .compact-head{align-items:flex-start;margin-bottom:12px}.staff-list{display:grid;gap:12px;margin-top:14px}.staff-card{border:1px solid var(--line);border-radius:18px;padding:16px;background:#fff}.staff-card-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.staff-email{font-size:13px;color:var(--muted);margin-top:4px;word-break:break-all}.staff-tags{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}.role-chip,.active-chip{font-size:12px;font-weight:900;border-radius:999px;padding:6px 10px;background:#fff0df;color:var(--orange-dark)}.active-chip.on{background:#e8f4e4;color:#47733e}.active-chip.off{background:#eee;color:#777}.staff-actions{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-top:14px}.staff-actions select,.staff-actions input{margin:0}.staff-actions button{white-space:nowrap}.hidden-by-role{display:none!important}@media(max-width:700px){.staff-actions{grid-template-columns:1fr}.staff-tags{justify-content:flex-start}.staff-card-top{flex-direction:column}}
+
+/* QR Code �𤥁疏�蠘� */
+.customer-qr{
+  width:214px;
+  min-height:214px;
+  margin:16px auto;
+  padding:12px;
+  background:#fff;
+  border:1px solid #eadfd8;
+  border-radius:18px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.customer-qr img,.customer-qr canvas{max-width:190px;height:auto}
+.pickup-tools{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.qr-reader{max-width:420px;margin:14px auto;border-radius:14px;overflow:hidden}
+.manual-pickup{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;margin-top:14px}
+.pickup-order{margin-top:16px}
+.pickup-code-line{margin:12px 0;padding:10px 12px;background:#fff7ef;border-radius:10px}
+.pickup-done{text-align:center;font-weight:700;color:#387547;padding:14px;background:#eef8f0;border-radius:12px}
+@media (max-width:640px){
+  .manual-pickup{grid-template-columns:1fr}
+}
