@@ -94,7 +94,19 @@ async function lookupPickupCode(rawCode){
  currentPickupOrder=null;
  if(!code){$('pickupMessage').textContent='請掃描 QR Code 或輸入取貨碼。';return;}
  $('pickupMessage').textContent='正在查詢訂單…';
- const result=await db.from('orders').select('*,order_items(*)').eq('pickup_code',code).maybeSingle();
+let result = await db
+  .from('orders')
+  .select('*,order_items(*)')
+  .eq('pickup_code', code)
+  .maybeSingle();
+
+if (!result.error && !result.data) {
+  result = await db
+    .from('orders')
+    .select('*,order_items(*)')
+    .eq('id', code)
+    .maybeSingle();
+}
  if(result.error){
   console.error(result.error);
   $('pickupMessage').textContent='查詢失敗，請確認 QR 取貨 SQL 已執行。';
