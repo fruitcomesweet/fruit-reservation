@@ -268,16 +268,28 @@ async function uploadProductImage(file) {
   const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
   const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
+  // 先把手機選到的照片轉成真正的二進位內容
+  const arrayBuffer = await file.arrayBuffer();
+
+  if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+    throw new Error('讀不到照片內容，請重新選擇照片');
+  }
+
   const { error: uploadError } = await db.storage
     .from('product-images')
-    .upload(fileName, file, {
+    .upload(fileName, arrayBuffer, {
       cacheControl: '3600',
-      upsert: false
+      upsert: false,
+      contentType: file.type || 'image/jpeg'
     });
 
   if (uploadError) {
     console.error(uploadError);
-throw new Error('商品照片上傳失敗：' + (uploadError.message || JSON.stringify(uploadError)));  }
+    throw new Error(
+      '商品照片上傳失敗：' +
+      (uploadError.message || JSON.stringify(uploadError))
+    );
+  }
 
   const { data } = db.storage
     .from('product-images')
