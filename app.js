@@ -32,13 +32,16 @@ async function refreshAdminOrders() {
 }
 function loadLocal() { products = load(LS.products, defaults.products); orders = load(LS.orders, []); settings = load(LS.settings, defaults.settings) }
 function applySettings() { $('storeLocation').textContent = settings.location; $('storeHours').textContent = settings.hours; $('openStatus').textContent = settings.open ? '預約開放中' : '目前暫停預約'; $('settingLocation').value = settings.location; $('settingHours').value = settings.hours; $('settingOpen').value = String(settings.open) }
-function renderProducts() { const visible = products.filter(p => p.active); $('emptyProducts').classList.toggle('hidden', visible.length); $('productGrid').innerHTML = visible.map(p => { const q = cart[p.id] || 0, sold = p.stock <= 0; return `<article class="product ${sold ? 'sold' : ''}"><div class="product-icon">
-  ${
-    p.image_url
-      ? `<img src="${esc(p.image_url)}" alt="${esc(p.name)}" class="product-image">`
-      : esc(p.emoji || '🍎')
-  }
-</div><h3>${esc(p.name)}</h3><div class="product-desc">${esc(p.description || '')}</div><div class="meta"><span class="price">${money(p.price)} / ${esc(p.unit)}</span><span class="stock">${sold ? '已售完' : `剩 ${p.stock} ${esc(p.unit)}`}</span></div><div class="qty"><button data-dec="${p.id}" ${sold ? 'disabled' : ''}>−</button><strong>${q}</strong><button data-inc="${p.id}" ${sold ? 'disabled' : ''}>＋</button></div></article>` }).join(''); document.querySelectorAll('[data-inc]').forEach(b => b.onclick = () => changeQty(b.dataset.inc, 1)); document.querySelectorAll('[data-dec]').forEach(b => b.onclick = () => changeQty(b.dataset.dec, -1)); }
+function renderProducts() {
+  const visible = products.filter(p => p.active); $('emptyProducts').classList.toggle('hidden', visible.length); $('productGrid').innerHTML = visible.map(p => {
+    const q = cart[p.id] || 0, sold = p.stock <= 0; return `<article class="product ${sold ? 'sold' : ''}"><div class="product-icon">
+  ${p.image_url
+        ? `<img src="${esc(p.image_url)}" alt="${esc(p.name)}" class="product-image">`
+        : esc(p.emoji || '🍎')
+      }
+</div><h3>${esc(p.name)}</h3><div class="product-desc">${esc(p.description || '')}</div><div class="meta"><span class="price">${money(p.price)} / ${esc(p.unit)}</span><span class="stock">${sold ? '已售完' : `剩 ${p.stock} ${esc(p.unit)}`}</span></div><div class="qty"><button data-dec="${p.id}" ${sold ? 'disabled' : ''}>−</button><strong>${q}</strong><button data-inc="${p.id}" ${sold ? 'disabled' : ''}>＋</button></div></article>`
+  }).join(''); document.querySelectorAll('[data-inc]').forEach(b => b.onclick = () => changeQty(b.dataset.inc, 1)); document.querySelectorAll('[data-dec]').forEach(b => b.onclick = () => changeQty(b.dataset.dec, -1));
+}
 function changeQty(id, d) { const p = products.find(x => String(x.id) === String(id)); const n = Math.max(0, Math.min(p.stock, (cart[id] || 0) + d)); if (n) cart[id] = n; else delete cart[id]; renderProducts(); renderCart() }
 function renderCart() { const lines = Object.entries(cart).map(([id, q]) => ({ p: products.find(x => String(x.id) === String(id)), q })).filter(x => x.p); const total = lines.reduce((s, x) => s + x.p.price * x.q, 0); $('cartCount').textContent = lines.length ? `${lines.reduce((s, x) => s + x.q, 0)} 件商品` : '尚未選商品'; $('cartSummary').innerHTML = lines.length ? lines.map(x => `<div class="cart-line"><span>${esc(x.p.emoji)} ${esc(x.p.name)} × ${x.q}</span><strong>${money(x.p.price * x.q)}</strong></div>`).join('') + `<div class="cart-line cart-total"><span>商品小計</span><span>${money(total)}</span></div>` : '請先選擇上方商品。' }
 function bind() {
@@ -345,9 +348,61 @@ async function addProduct() {
     console.error(err);
     alert('新增商品失敗：' + (err.message || err));
   }
-} function renderProductAdmin() { $('productAdminList').innerHTML = products.map(p => `<article class="admin-product"><div class="admin-product-top"><div><strong>${esc(p.emoji)} ${esc(p.name)}</strong><div class="order-id">${money(p.price)} / ${esc(p.unit)}</div></div><button class="danger" data-delete="${p.id}">刪除</button></div><div class="admin-product-controls"><label>價格<input type="number" min="0" value="${p.price}" data-price="${p.id}"></label><label>庫存<input type="number" min="0" value="${p.stock}" data-stock="${p.id}"></label><label><input type="checkbox" ${p.active ? 'checked' : ''} data-active="${p.id}"> 顯示商品</label></div></article>`).join(''); document.querySelectorAll('[data-price],[data-stock],[data-active]').forEach(el => el.onchange = () => editProduct(el)); document.querySelectorAll('[data-delete]').forEach(b => b.onclick = () => deleteProduct(b.dataset.delete)) }
-async function editProduct(el) { if (!adminSession) return alert('請先登入後台'); const id = el.dataset.price || el.dataset.stock || el.dataset.active, patch = {}; if (el.dataset.price) patch.price = Math.max(0, +el.value || 0); if (el.dataset.stock) patch.stock = Math.max(0, +el.value || 0); if (el.dataset.active) patch.active = el.checked; if (ONLINE) { const r = await db.from('products').update(patch).eq('id', id); if (r.error) return alert(r.error.message) } else { Object.assign(products.find(p => String(p.id) === String(id)), patch); save(LS.products, products) } await refreshAll(); renderAdmin() }
-async function deleteProduct(id) { if (!adminSession) return alert('請先登入後台'); if (!confirm('確定刪除此商品？')) return; if (ONLINE) { const r = await db.from('products').delete().eq('id', id); if (r.error) return alert(r.error.message) } else { products = products.filter(p => String(p.id) !== String(id)); save(LS.products, products) } await refreshAll(); renderAdmin() }
+} function renderProductAdmin() { $('productAdminList').innerHTML = products.map(p => `<article class="admin-product"><div class="admin-product-top"><div><strong>${esc(p.emoji)} ${esc(p.name)}</strong><div class="order-id">${money(p.price)} / ${esc(p.unit)}</div></div><button class="secondary" data-edit="${p.id}">編輯商品</button></div><div class="admin-product-controls"><label>價格<input type="number" min="0" value="${p.price}" data-price="${p.id}"></label><label>庫存<input type="number" min="0" value="${p.stock}" data-stock="${p.id}"></label><label><input type="checkbox" ${p.active ? 'checked' : ''} data-active="${p.id}"> 顯示商品</label></div></article>`).join(''); document.querySelectorAll('[data-price],[data-stock],[data-active]').forEach(el => el.onchange = () => editProduct(el)); document.querySelectorAll('[data-delete]').forEach(b => b.onclick = () => deleteProduct(b.dataset.delete)) }
+async function editProduct(el) {
+  if (!adminSession) return alert('請先登入後台');
+
+  const id = el.dataset.edit;
+  const p = products.find(x => String(x.id) === String(id));
+  if (!p) return alert('找不到商品');
+
+  const newPrice = prompt('修改價格', p.price);
+  if (newPrice === null) return;
+
+  const newStock = prompt('修改庫存', p.stock);
+  if (newStock === null) return;
+
+  const action = prompt(
+    `商品目前狀態：${p.active === false ? '已結單' : '開放預約'}\n\n請輸入：\n1 = 儲存並開放預約\n2 = 儲存並結單\n3 = 刪除商品`,
+    p.active === false ? '2' : '1'
+  );
+
+  if (action === null) return;
+
+  if (action === '3') {
+    if (!confirm(`確定要刪除「${p.name}」嗎？`)) return;
+    await deleteProduct(id);
+    return;
+  }
+
+  if (action !== '1' && action !== '2') {
+    return alert('請輸入 1、2 或 3');
+  }
+
+  const patch = {
+    price: Math.max(0, Number(newPrice) || 0),
+    stock: Math.max(0, Number(newStock) || 0),
+    active: action === '1'
+  };
+
+  if (ONLINE) {
+    const { error } = await db
+      .from('products')
+      .update(patch)
+      .eq('id', id);
+
+    if (error) return alert('修改商品失敗：' + error.message);
+
+    await refreshAll();
+  } else {
+    Object.assign(p, patch);
+    save(LS.products, products);
+  }
+
+  renderAdmin();
+  renderProducts();
+  alert(action === '2' ? '商品已結單' : '商品修改成功');
+}async function deleteProduct(id) { if (!adminSession) return alert('請先登入後台'); if (!confirm('確定刪除此商品？')) return; if (ONLINE) { const r = await db.from('products').delete().eq('id', id); if (r.error) return alert(r.error.message) } else { products = products.filter(p => String(p.id) !== String(id)); save(LS.products, products) } await refreshAll(); renderAdmin() }
 async function saveSettings() { if (!adminSession) return alert('請先登入後台'); const patch = { location: $('settingLocation').value.trim(), hours: $('settingHours').value.trim(), open: $('settingOpen').value === 'true' }; if (ONLINE) { const r = await db.from('store_settings').upsert({ id: 1, ...patch }); if (r.error) return alert(r.error.message) } else { settings = patch; save(LS.settings, settings) } await refreshAll(); alert('設定已儲存') }
 function exportCSV() { if (!adminSession) return alert('請先登入後台'); const rows = [['預約編號', '時間', '姓名', '電話', '狀態', '取貨時段', '方式', '商品', '金額', '地址', '備註'], ...orders.map(o => [o.id, o.created_at || o.createdAt, o.name, o.phone, o.status, o.pickup_time || o.pickup, o.method, (o.items || []).map(i => `${i.name}x${i.qty}`).join(' / '), o.total, o.address, o.note])]; const csv = '\ufeff' + rows.map(r => r.map(v => `"${String(v ?? '').replaceAll('"', '""')}"`).join(',')).join('\n'); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = `果來好甜訂單-${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(a.href) }
 
