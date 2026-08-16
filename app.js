@@ -349,6 +349,11 @@ async function addProduct() {
     alert('新增商品失敗：' + (err.message || err));
   }
 } function renderProductAdmin() { $('productAdminList').innerHTML = products.map(p => `<article class="admin-product"><div class="admin-product-top"><div><strong>${esc(p.emoji)} ${esc(p.name)}</strong><div class="order-id">${money(p.price)} / ${esc(p.unit)}</div></div><button class="secondary" data-edit="${p.id}">編輯商品</button></div><div class="admin-product-controls"><label>價格<input type="number" min="0" value="${p.price}" data-price="${p.id}"></label><label>庫存<input type="number" min="0" value="${p.stock}" data-stock="${p.id}"></label><label><input type="checkbox" ${p.active ? 'checked' : ''} data-active="${p.id}"> 顯示商品</label></div></article>`).join(''); document.querySelectorAll('[data-price],[data-stock],[data-active]').forEach(el => el.onchange = () => editProduct(el)); document.querySelectorAll('[data-delete]').forEach(b => b.onclick = () => deleteProduct(b.dataset.delete)) }
+document.addEventListener('click', e => {
+  const btn = e.target.closest('[data-edit]');
+  if (!btn) return;
+  editProduct(btn);
+});
 async function editProduct(el) {
   if (!adminSession) return alert('請先登入後台');
 
