@@ -52,6 +52,10 @@ function bind() {
 async function submitOrder(e) {
   e.preventDefault(); $('formMessage').textContent = ''; if (!settings.open) return fail('目前暫停預約。'); const entries = Object.entries(cart); if (!entries.length) return fail('請先選擇至少一項商品。'); const name = $('name').value.trim(), phone = $('phone').value.trim(), pickup = $('pickupTime').value, method = document.querySelector('input[name="method"]:checked').value, address = $('address').value.trim(); if (!name || !/^09\d{8}$/.test(phone) || !pickup || !$('agree').checked) return fail('請確認姓名、10碼手機、取貨時間與同意事項。'); if (method === 'Lalamove配送' && !address) return fail('請填寫配送地址。'); const items = entries.map(([id, qty]) => { const p = products.find(x => String(x.id) === String(id)); return { product_id: p.id, name: p.name, unit: p.unit, price: p.price, qty, emoji: p.emoji } }); for (const i of items) { const p = products.find(x => String(x.id) === String(i.product_id)); if (!p || i.qty > p.stock) return fail(`${i.name} 庫存不足。`) } const total = items.reduce((s, i) => s + i.price * i.qty, 0), status = method === 'Lalamove配送' ? '等待報價' : '未取'; let order;
   try { if (ONLINE) { const rpc = await db.rpc('create_reservation', { p_name: name, p_phone: phone, p_line_name: $('lineName').value.trim(), p_pickup_time: pickup, p_method: method, p_address: address, p_note: $('note').value.trim(), p_status: status, p_items: items }); if (rpc.error) throw rpc.error; order = { ...rpc.data, items } } else { const id = `GL${new Date().toISOString().slice(5, 10).replace('-', '')}-${String(orders.length + 1).padStart(3, '0')}`; order = { id, created_at: new Date().toISOString(), name, phone, line_name: $('lineName').value.trim(), pickup_time: pickup, method, address, note: $('note').value.trim(), status, total, items }; orders.unshift(order); if (method === '現場自取') items.forEach(i => products.find(p => String(p.id) === String(i.product_id)).stock -= i.qty); save(LS.orders, orders); save(LS.products, products) } } catch (err) { console.error(err); return fail('送出失敗，請稍後再試或聯絡小編。') }
+const dailyResult = await db.rpc('get_order_daily_number', {
+  p_order_id: order.id
+});
+if (!dailyResult.error) order.daily_number = dailyResult.data;
   showSuccess(order); cart = {}; e.target.reset(); document.querySelector('input[value="現場自取"]').checked = true; $('deliveryFields').classList.add('hidden'); await refreshAll();
 }
 function fail(t) { $('formMessage').textContent = t }
@@ -128,6 +132,28 @@ async function lookupMyOrders() {
 function showSuccess(o) {
   const pickupCode = o.pickup_code || o.id;
   $('successContent').innerHTML = `<div style="font-size:48px;text-align:center">🍊</div><h2 style="text-align:center">已收到預約</h2><p style="text-align:center">請截圖保存 QR Code，取貨時出示給店員</p><div id="customerQrCode" class="customer-qr"></div><div class="success-number">${esc(pickupCode)}</div>${o.items.map(i => `<div class="cart-line"><span>${esc(i.emoji)} ${esc(i.name)} × ${i.qty}</span><strong>${money(i.price * i.qty)}</strong></div>`).join('')}<div class="cart-line cart-total"><span>商品小計</span><span>${money(o.total)}</span></div><div class="cart-line"><span>取貨</span><span>${esc(o.pickup_time || o.pickup)}／${esc(o.method)}</span></div><div class="cart-line"><span>狀態</span><span>${esc(o.status)}</span></div><p class="helper">QR Code 無法掃描時，也可以提供上方取貨碼。</p>`;
+  const dailyNumber = o.daily_number;
+
+if (dailyNumber) {
+  $('successContent').insertAdjacentHTML(
+    'afterbegin',
+    `
+      <div style="
+        text-align:center;
+        margin:10px 0 22px;
+        padding:18px;
+        background:#fff7ed;
+        border-radius:18px;
+      ">
+        <div style="font-size:18px;font-weight:700;">今日取貨號碼</div>
+        <div style="font-size:64px;font-weight:900;line-height:1.15;">
+          ${dailyNumber}
+        </div>
+        <div style="font-size:16px;color:#777;">號</div>
+      </div>
+    `
+  );
+}
   $('successDialog').showModal();
   const qrTarget = $('customerQrCode');
   if (window.QRCode && qrTarget) new QRCode(qrTarget, { text: String(pickupCode), width: 190, height: 190, correctLevel: QRCode.CorrectLevel.M });
