@@ -12,7 +12,7 @@ async function init() {
   $('todayText').textContent = new Intl.DateTimeFormat('zh-TW', { month: 'long', day: 'numeric', weekday: 'short' }).format(new Date()) + '｜每日新鮮上架';
   $('onlineBadge').textContent = ONLINE ? '雲端同步' : '設定未完成'; $('onlineBadge').style.background = ONLINE ? '#eef6ef' : '#fff1db';
   if (!ONLINE) alert('Supabase 連線設定尚未完成，網站不能正式使用。');
-  await refreshAll(); bind();
+  await refreshAll(); bind(); resetVariantRows();
   if (ONLINE) { const { data } = await db.auth.getSession(); adminSession = data.session || null; if (adminSession) await loadCurrentStaff(); updateAdminView(); db.auth.onAuthStateChange(async (_event, session) => { adminSession = session; currentStaff = null; if (session) await loadCurrentStaff(); updateAdminView(); }); }
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./service-worker.js').catch(() => { });
 }
@@ -32,26 +32,41 @@ async function refreshAdminOrders() {
 }
 function loadLocal() { products = load(LS.products, defaults.products); orders = load(LS.orders, []); settings = load(LS.settings, defaults.settings) }
 function applySettings() { $('storeLocation').textContent = settings.location; $('storeHours').textContent = settings.hours; $('openStatus').textContent = settings.open ? '預約開放中' : '目前暫停預約'; $('settingLocation').value = settings.location; $('settingHours').value = settings.hours; $('settingOpen').value = String(settings.open) }
+function getVariants(p) {
+  const raw = Array.isArray(p.variants) ? p.variants : [];
+  return raw.length ? raw.map((v, idx) => ({ id: String(v.id || `v${idx+1}`), name: String(v.name || p.unit || '規格'), unit: String(v.unit || v.name || p.unit || '份'), price: Number(v.price ?? p.price ?? 0), stock_cost: Math.max(1, Number(v.stock_cost || 1)) })) : [{ id: 'default', name: p.unit || '單份', unit: p.unit || '份', price: Number(p.price || 0), stock_cost: 1 }];
+}
+function cartKey(productId, variantId) { return `${productId}::${variantId}`; }
 function renderProducts() {
   const visible = products.filter(p => p.active); $('emptyProducts').classList.toggle('hidden', visible.length); $('productGrid').innerHTML = visible.map(p => {
-    const q = cart[p.id] || 0, sold = p.stock <= 0; return `<article class="product ${sold ? 'sold' : ''}"><div class="product-icon">
-  ${p.image_url
-        ? `<img src="${esc(p.image_url)}" alt="${esc(p.name)}" class="product-image">`
-        : esc(p.emoji || '🍎')
-      }
-</div><h3>${esc(p.name)}</h3><div class="product-desc">${esc(p.description || '')}</div><div class="meta"><span class="price">${money(p.price)} / ${esc(p.unit)}</span><span class="stock">${sold ? '已售完' : `剩 ${p.stock} ${esc(p.unit)}`}</span></div><div class="qty"><button data-dec="${p.id}" ${sold ? 'disabled' : ''}>−</button><strong>${q}</strong><button data-inc="${p.id}" ${sold ? 'disabled' : ''}>＋</button></div></article>`
-  }).join(''); document.querySelectorAll('[data-inc]').forEach(b => b.onclick = () => changeQty(b.dataset.inc, 1)); document.querySelectorAll('[data-dec]').forEach(b => b.onclick = () => changeQty(b.dataset.dec, -1));
+    const variants = getVariants(p), first = variants[0], sold = p.stock < Math.min(...variants.map(v => v.stock_cost));
+    const options = variants.map(v => `<option value="${esc(v.id)}">${esc(v.name)}｜${money(v.price)} / ${esc(v.unit)}${v.stock_cost > 1 ? `（扣 ${v.stock_cost} ${esc(p.unit)}）` : ''}</option>`).join('');
+    return `<article class="product ${sold ? 'sold' : ''}" data-product-card="${p.id}"><div class="product-icon">${p.image_url ? `<img src="${esc(p.image_url)}" alt="${esc(p.name)}" class="product-image">` : esc(p.emoji || '🍎')}</div><h3>${esc(p.name)}</h3><div class="product-desc">${esc(p.description || '')}</div><label class="variant-label">選擇規格<select data-variant-select="${p.id}">${options}</select></label><div class="meta"><span class="price" data-variant-price="${p.id}">${money(first.price)} / ${esc(first.unit)}</span><span class="stock">基礎庫存剩 ${p.stock} ${esc(p.unit)}</span></div><div class="qty"><button data-dec-product="${p.id}" ${sold ? 'disabled' : ''}>−</button><strong data-product-qty="${p.id}">0</strong><button data-inc-product="${p.id}" ${sold ? 'disabled' : ''}>＋</button></div></article>`;
+  }).join('');
+  document.querySelectorAll('[data-variant-select]').forEach(s => s.onchange = () => updateVariantCard(s.dataset.variantSelect));
+  document.querySelectorAll('[data-inc-product]').forEach(b => b.onclick = () => changeVariantQty(b.dataset.incProduct, 1));
+  document.querySelectorAll('[data-dec-product]').forEach(b => b.onclick = () => changeVariantQty(b.dataset.decProduct, -1));
+  visible.forEach(p => updateVariantCard(p.id));
 }
-function changeQty(id, d) { const p = products.find(x => String(x.id) === String(id)); const n = Math.max(0, Math.min(p.stock, (cart[id] || 0) + d)); if (n) cart[id] = n; else delete cart[id]; renderProducts(); renderCart() }
-function renderCart() { const lines = Object.entries(cart).map(([id, q]) => ({ p: products.find(x => String(x.id) === String(id)), q })).filter(x => x.p); const total = lines.reduce((s, x) => s + x.p.price * x.q, 0); $('cartCount').textContent = lines.length ? `${lines.reduce((s, x) => s + x.q, 0)} 件商品` : '尚未選商品'; $('cartSummary').innerHTML = lines.length ? lines.map(x => `<div class="cart-line"><span>${esc(x.p.emoji)} ${esc(x.p.name)} × ${x.q}</span><strong>${money(x.p.price * x.q)}</strong></div>`).join('') + `<div class="cart-line cart-total"><span>商品小計</span><span>${money(total)}</span></div>` : '請先選擇上方商品。' }
+function selectedVariant(p) { const s = document.querySelector(`[data-variant-select="${p.id}"]`); return getVariants(p).find(v => v.id === s?.value) || getVariants(p)[0]; }
+function updateVariantCard(productId) {
+  const p = products.find(x => String(x.id) === String(productId)); if (!p) return; const v = selectedVariant(p), key = cartKey(p.id, v.id), q = cart[key]?.qty || 0;
+  const price = document.querySelector(`[data-variant-price="${p.id}"]`), qty = document.querySelector(`[data-product-qty="${p.id}"]`); if (price) price.textContent = `${money(v.price)} / ${v.unit}`; if (qty) qty.textContent = q;
+}
+function changeVariantQty(productId, d) {
+  const p = products.find(x => String(x.id) === String(productId)); if (!p) return; const v = selectedVariant(p), key = cartKey(p.id, v.id), current = cart[key]?.qty || 0;
+  const otherCost = Object.values(cart).filter(x => String(x.product_id) === String(p.id) && x.variant_id !== v.id).reduce((s,x)=>s+x.qty*x.stock_cost,0); const max = Math.max(0, Math.floor((p.stock-otherCost)/v.stock_cost)); const n = Math.max(0, Math.min(max, current+d));
+  if (n) cart[key] = { product_id:p.id, variant_id:v.id, variant_name:v.name, unit:v.unit, price:v.price, stock_cost:v.stock_cost, qty:n }; else delete cart[key]; renderProducts(); renderCart();
+}
+function renderCart() { const lines = Object.values(cart).map(x => ({...x,p:products.find(p=>String(p.id)===String(x.product_id))})).filter(x=>x.p); const total=lines.reduce((s,x)=>s+x.price*x.qty,0); $('cartCount').textContent=lines.length?`${lines.reduce((s,x)=>s+x.qty,0)} 件商品`:'尚未選商品'; $('cartSummary').innerHTML=lines.length?lines.map(x=>`<div class="cart-line"><span>${esc(x.p.emoji)} ${esc(x.p.name)}｜${esc(x.variant_name)} × ${x.qty}</span><strong>${money(x.price*x.qty)}</strong></div>`).join('')+`<div class="cart-line cart-total"><span>商品小計</span><span>${money(total)}</span></div>`:'請先選擇上方商品。' }
 function bind() {
   const lookupBtn = $('lookupMyOrders');
   if (lookupBtn) lookupBtn.onclick = lookupMyOrders;
-  document.querySelectorAll('input[name="method"]').forEach(r => r.onchange = () => { $('deliveryFields').classList.toggle('hidden', !(r.checked && r.value === 'Lalamove配送')) }); $('reservationForm').onsubmit = submitOrder; $('openAdmin').onclick = async () => { $('adminDialog').showModal(); if (ONLINE) { const { data } = await db.auth.getSession(); adminSession = data.session || null; updateAdminView(); if (adminSession) { await refreshAdminOrders(); renderAdmin(); } } }; $('closeAdmin').onclick = () => $('adminDialog').close(); $('closeSuccess').onclick = () => $('successDialog').close(); $('unlockAdmin').onclick = unlock; $('logoutAdmin').onclick = logout; document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab)); $('statusFilter').onchange = renderOrders; $('orderSearch').oninput = renderOrders; $('exportOrders').onclick = exportCSV; $('addProduct').onclick = addProduct; $('saveSettings').onclick = saveSettings; $('saveStaff').onclick = saveStaff; $('startQrScanner').onclick = startQrScanner; $('stopQrScanner').onclick = stopQrScanner; $('lookupPickupCode').onclick = () => lookupPickupCode($('manualPickupCode').value); $('manualPickupCode').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); lookupPickupCode(e.currentTarget.value) } }
+  document.querySelectorAll('input[name="method"]').forEach(r => r.onchange = () => { $('deliveryFields').classList.toggle('hidden', !(r.checked && r.value === 'Lalamove配送')) }); $('reservationForm').onsubmit = submitOrder; $('openAdmin').onclick = async () => { $('adminDialog').showModal(); if (ONLINE) { const { data } = await db.auth.getSession(); adminSession = data.session || null; updateAdminView(); if (adminSession) { await refreshAdminOrders(); renderAdmin(); } } }; $('closeAdmin').onclick = () => $('adminDialog').close(); $('closeSuccess').onclick = () => $('successDialog').close(); $('unlockAdmin').onclick = unlock; $('logoutAdmin').onclick = logout; document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab)); $('statusFilter').onchange = renderOrders; $('orderSearch').oninput = renderOrders; $('exportOrders').onclick = exportCSV; $('addProduct').onclick = addProduct; $('addVariant').onclick = () => addVariantRow(); $('saveSettings').onclick = saveSettings; $('saveStaff').onclick = saveStaff; $('startQrScanner').onclick = startQrScanner; $('stopQrScanner').onclick = stopQrScanner; $('lookupPickupCode').onclick = () => lookupPickupCode($('manualPickupCode').value); $('manualPickupCode').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); lookupPickupCode(e.currentTarget.value) } }
 }
 async function submitOrder(e) {
-  e.preventDefault(); $('formMessage').textContent = ''; if (!settings.open) return fail('目前暫停預約。'); const entries = Object.entries(cart); if (!entries.length) return fail('請先選擇至少一項商品。'); const name = $('name').value.trim(), phone = $('phone').value.trim(), pickup = $('pickupTime').value, method = document.querySelector('input[name="method"]:checked').value, address = $('address').value.trim(); if (!name || !/^09\d{8}$/.test(phone) || !pickup || !$('agree').checked) return fail('請確認姓名、10碼手機、取貨時間與同意事項。'); if (method === 'Lalamove配送' && !address) return fail('請填寫配送地址。'); const items = entries.map(([id, qty]) => { const p = products.find(x => String(x.id) === String(id)); return { product_id: p.id, name: p.name, unit: p.unit, price: p.price, qty, emoji: p.emoji } }); for (const i of items) { const p = products.find(x => String(x.id) === String(i.product_id)); if (!p || i.qty > p.stock) return fail(`${i.name} 庫存不足。`) } const total = items.reduce((s, i) => s + i.price * i.qty, 0), status = method === 'Lalamove配送' ? '等待報價' : '未取'; let order;
-  try { if (ONLINE) { const rpc = await db.rpc('create_reservation', { p_name: name, p_phone: phone, p_line_name: $('lineName').value.trim(), p_pickup_time: pickup, p_method: method, p_address: address, p_note: $('note').value.trim(), p_status: status, p_items: items }); if (rpc.error) throw rpc.error; order = { ...rpc.data, items } } else { const id = `GL${new Date().toISOString().slice(5, 10).replace('-', '')}-${String(orders.length + 1).padStart(3, '0')}`; order = { id, created_at: new Date().toISOString(), name, phone, line_name: $('lineName').value.trim(), pickup_time: pickup, method, address, note: $('note').value.trim(), status, total, items }; orders.unshift(order); if (method === '現場自取') items.forEach(i => products.find(p => String(p.id) === String(i.product_id)).stock -= i.qty); save(LS.orders, orders); save(LS.products, products) } } catch (err) { console.error(err); return fail('送出失敗，請稍後再試或聯絡小編。') }
+  e.preventDefault(); $('formMessage').textContent = ''; if (!settings.open) return fail('目前暫停預約。'); const entries = Object.values(cart); if (!entries.length) return fail('請先選擇至少一項商品。'); const name = $('name').value.trim(), phone = $('phone').value.trim(), pickup = $('pickupTime').value, method = document.querySelector('input[name="method"]:checked').value, address = $('address').value.trim(); if (!name || !/^09\d{8}$/.test(phone) || !pickup || !$('agree').checked) return fail('請確認姓名、10碼手機、取貨時間與同意事項。'); if (method === 'Lalamove配送' && !address) return fail('請填寫配送地址。'); const items = entries.map(x => { const p = products.find(y => String(y.id) === String(x.product_id)); return { product_id:p.id, name:p.name, unit:x.unit, price:x.price, qty:x.qty, emoji:p.emoji, variant_id:x.variant_id, variant_name:x.variant_name, stock_cost:x.stock_cost } }); const costs={}; for (const i of items) costs[i.product_id]=(costs[i.product_id]||0)+i.qty*i.stock_cost; for (const [pid,cost] of Object.entries(costs)) { const p=products.find(x=>String(x.id)===String(pid)); if(!p||cost>p.stock) return fail(`${p?.name||'商品'} 庫存不足。`) } const total = items.reduce((s, i) => s + i.price * i.qty, 0), status = method === 'Lalamove配送' ? '等待報價' : '未取'; let order;
+  try { if (ONLINE) { const rpc = await db.rpc('create_reservation', { p_name: name, p_phone: phone, p_line_name: $('lineName').value.trim(), p_pickup_time: pickup, p_method: method, p_address: address, p_note: $('note').value.trim(), p_status: status, p_items: items }); if (rpc.error) throw rpc.error; order = { ...rpc.data, items } } else { const id = `GL${new Date().toISOString().slice(5, 10).replace('-', '')}-${String(orders.length + 1).padStart(3, '0')}`; order = { id, created_at: new Date().toISOString(), name, phone, line_name: $('lineName').value.trim(), pickup_time: pickup, method, address, note: $('note').value.trim(), status, total, items }; orders.unshift(order); if (method === '現場自取') items.forEach(i => products.find(p => String(p.id) === String(i.product_id)).stock -= i.qty * (i.stock_cost || 1)); save(LS.orders, orders); save(LS.products, products) } } catch (err) { console.error(err); return fail('送出失敗，請稍後再試或聯絡小編。') }
 const dailyResult = await db.rpc('get_order_daily_number', {
   p_order_id: order.id
 });
@@ -142,7 +157,7 @@ async function lookupMyOrders() {
 }
 function showSuccess(o) {
   const pickupCode = o.pickup_code || o.id;
-  $('successContent').innerHTML = `<div style="font-size:48px;text-align:center">🍊</div><h2 style="text-align:center">已收到預約</h2><p style="text-align:center">請截圖保存 QR Code，取貨時出示給店員</p><div id="customerQrCode" class="customer-qr"></div><div class="success-number">${esc(pickupCode)}</div>${o.items.map(i => `<div class="cart-line"><span>${esc(i.emoji)} ${esc(i.name)} × ${i.qty}</span><strong>${money(i.price * i.qty)}</strong></div>`).join('')}<div class="cart-line cart-total"><span>商品小計</span><span>${money(o.total)}</span></div><div class="cart-line"><span>取貨</span><span>${esc(o.pickup_time || o.pickup)}／${esc(o.method)}</span></div><div class="cart-line"><span>狀態</span><span>${esc(o.status)}</span></div><p class="helper">QR Code 無法掃描時，也可以提供上方取貨碼。</p>`;
+  $('successContent').innerHTML = `<div style="font-size:48px;text-align:center">🍊</div><h2 style="text-align:center">已收到預約</h2><p style="text-align:center">請截圖保存 QR Code，取貨時出示給店員</p><div id="customerQrCode" class="customer-qr"></div><div class="success-number">${esc(pickupCode)}</div>${o.items.map(i => `<div class="cart-line"><span>${esc(i.emoji)} ${esc(i.name)}${i.variant_name ? `｜${esc(i.variant_name)}` : ''} × ${i.qty}（${money(i.price)} / ${esc(i.unit)}）</span><strong>${money(i.price * i.qty)}</strong></div>`).join('')}<div class="cart-line cart-total"><span>商品小計</span><span>${money(o.total)}</span></div><div class="cart-line"><span>取貨</span><span>${esc(o.pickup_time || o.pickup)}／${esc(o.method)}</span></div><div class="cart-line"><span>狀態</span><span>${esc(o.status)}</span></div><p class="helper">QR Code 無法掃描時，也可以提供上方取貨碼。</p>`;
   const dailyNumber = o.daily_number;
 
 if (dailyNumber) {
@@ -251,7 +266,7 @@ function renderPickupOrder(o) {
   </div>
   ${o.daily_number ? `<div class="pickup-code-line">今日取貨號碼：<strong>${esc(o.daily_number)} 號</strong></div>` : ''}
   <div class="pickup-code-line">取貨碼：<strong>${esc(o.pickup_code || '')}</strong></div>
-  <div class="order-lines">${(o.items || []).map(i => `${esc(i.emoji)} ${esc(i.name)} × ${i.qty}`).join('<br>')}</div>
+  <div class="order-lines">${(o.items || []).map(i => `${esc(i.emoji)} ${esc(i.name)}${i.variant_name ? `｜${esc(i.variant_name)}` : ''} × ${i.qty}（${money(i.price)} / ${esc(i.unit)}）`).join('<br>')}</div>
   <div class="cart-line cart-total"><span>商品小計</span><span>${money(o.total)}</span></div>
   <div class="order-lines">${esc(o.pickup_time || '')}｜${esc(o.method || '')}${o.note ? `<br>備註：${esc(o.note)}` : ''}</div>
   ${alreadyPicked
@@ -305,7 +320,7 @@ function renderOrders() { const f = $('statusFilter').value, q = $('orderSearch'
   <strong>${esc(o.name)}</strong>
   <div class="order-id">${esc(o.phone)}｜${esc(o.id)}</div>
   ${o.daily_number ? `<div style="margin-top:6px;font-weight:800;font-size:18px;">今日取貨號碼：${esc(o.daily_number)} 號</div>` : ''}
-</div><span class="status-badge">${esc(o.status)}</span></div><div class="order-lines">${(o.items || []).map(i => `${esc(i.emoji)} ${esc(i.name)} × ${i.qty}`).join('、')}<br>${esc(o.pickup_time || o.pickup)}｜${esc(o.method)}｜${money(o.total)}${o.note ? `<br>備註：${esc(o.note)}` : ''}</div><div class="order-actions">${['未取', '等待報價', '已確認', '已取', '已取消'].map(s => `<button data-order="${o.id}" data-status="${s}">${s}</button>`).join('')}</div></article>`).join('') : '<div class="empty">目前沒有符合條件的訂單。</div>'; document.querySelectorAll('[data-order]').forEach(b => b.onclick = () => updateOrder(b.dataset.order, b.dataset.status)); renderStats() }
+</div><span class="status-badge">${esc(o.status)}</span></div><div class="order-lines">${(o.items || []).map(i => `${esc(i.emoji)} ${esc(i.name)}${i.variant_name ? `｜${esc(i.variant_name)}` : ''} × ${i.qty}（${money(i.price)} / ${esc(i.unit)}）`).join('、')}<br>${esc(o.pickup_time || o.pickup)}｜${esc(o.method)}｜${money(o.total)}${o.note ? `<br>備註：${esc(o.note)}` : ''}</div><div class="order-actions">${['未取', '等待報價', '已確認', '已取', '已取消'].map(s => `<button data-order="${o.id}" data-status="${s}">${s}</button>`).join('')}</div></article>`).join('') : '<div class="empty">目前沒有符合條件的訂單。</div>'; document.querySelectorAll('[data-order]').forEach(b => b.onclick = () => updateOrder(b.dataset.order, b.dataset.status)); renderStats() }
 async function updateOrder(id, status) { if (!adminSession) return alert('請先登入後台'); if (ONLINE) { const r = await db.rpc('update_order_status', { p_order_id: id, p_new_status: status }); if (r.error) return alert(r.error.message) } else { const o = orders.find(x => x.id === id); o.status = status; save(LS.orders, orders) } await refreshAll(); renderAdmin() }
 async function uploadProductImage(file) {
   if (!file) return null;
@@ -342,19 +357,22 @@ async function uploadProductImage(file) {
 
   return data.publicUrl;
 }
+function parseVariantText(text='') { return String(text).split(/\n+/).map((line,idx)=>{const [name,price,unit,cost]=line.split('|').map(x=>x.trim());return {id:`v${idx+1}`,name,price:Number(price),unit:unit||name,stock_cost:Math.max(1,Number(cost)||1)}}).filter(v=>v.name&&v.price>=0); }
+function readVariantRows(){ return [...document.querySelectorAll('.variant-row')].map((r,idx)=>({id:`v${idx+1}`,name:r.querySelector('[data-v-name]').value.trim(),price:Number(r.querySelector('[data-v-price]').value),unit:r.querySelector('[data-v-unit]').value.trim(),stock_cost:Math.max(1,Number(r.querySelector('[data-v-cost]').value)||1)})).filter(v=>v.name&&v.unit&&v.price>=0); }
+function addVariantRow(values={}){ const box=$('variantRows'), div=document.createElement('div'); div.className='variant-row'; div.innerHTML=`<input data-v-name placeholder="規格，例如：單房" value="${esc(values.name||'')}"><input data-v-price type="number" min="0" placeholder="價格" value="${values.price??''}"><input data-v-unit placeholder="販售單位，例如：房" value="${esc(values.unit||'')}"><input data-v-cost type="number" min="1" placeholder="扣庫存" value="${values.stock_cost||1}"><button type="button" class="secondary variant-remove">×</button>`; div.querySelector('.variant-remove').onclick=()=>{if(box.children.length>1)div.remove()}; box.appendChild(div); }
+function resetVariantRows(){ $('variantRows').innerHTML=''; addVariantRow(); }
 async function addProduct() {
   if (!adminSession) return alert('請先登入後台');
 
   const name = $('newName').value.trim();
   const unit = $('newUnit').value.trim();
-  const price = Number($('newPrice').value);
+  const price = Number($('newPrice').value || 0);
   const stock = Number($('newStock').value);
   const emoji = $('newEmoji').value.trim();
   const imageFile = $('newImage')?.files?.[0];
 
-  if (!name || !unit || !price) {
-    return alert('請完整填寫商品資料');
-  }
+  const variants = readVariantRows();
+  if (!name || !unit || !variants.length) { return alert('請填寫商品名稱、基礎庫存單位，並至少新增一個規格'); }
 
   try {
     let image_url = null;
@@ -366,8 +384,9 @@ async function addProduct() {
     const p = {
       name,
       unit,
-      price,
+      price: variants[0].price,
       stock,
+      variants,
       emoji,
       image_url
     };
@@ -383,73 +402,28 @@ async function addProduct() {
       save(LS.products, products);
     }
 
-    $('newImage').value = '';
+    $('newImage').value = ''; resetVariantRows();
     renderAdmin();
     alert('商品新增成功');
   } catch (err) {
     console.error(err);
     alert('新增商品失敗：' + (err.message || err));
   }
-} function renderProductAdmin() { $('productAdminList').innerHTML = products.map(p => `<article class="admin-product"><div class="admin-product-top"><div><strong>${esc(p.emoji)} ${esc(p.name)}</strong><div class="order-id">${money(p.price)} / ${esc(p.unit)}</div></div><button class="secondary" data-edit="${p.id}">編輯商品</button></div><div class="admin-product-controls"><label>價格<input type="number" min="0" value="${p.price}" data-price="${p.id}"></label><label>庫存<input type="number" min="0" value="${p.stock}" data-stock="${p.id}"></label><label><input type="checkbox" ${p.active ? 'checked' : ''} data-active="${p.id}"> 顯示商品</label></div></article>`).join(''); document.querySelectorAll('[data-price],[data-stock],[data-active]').forEach(el => el.onchange = () => editProduct(el)); document.querySelectorAll('[data-delete]').forEach(b => b.onclick = () => deleteProduct(b.dataset.delete)) }
+} function renderProductAdmin() { $('productAdminList').innerHTML = products.map(p => { const vs=getVariants(p); return `<article class="admin-product"><div class="admin-product-top"><div><strong>${esc(p.emoji)} ${esc(p.name)}</strong><div class="order-id">基礎庫存：${p.stock} ${esc(p.unit)}</div><div class="variant-admin-summary">${vs.map(v=>`${esc(v.name)} ${money(v.price)} / ${esc(v.unit)}｜扣 ${v.stock_cost} ${esc(p.unit)}`).join('<br>')}</div></div><button class="secondary" data-edit="${p.id}">編輯商品</button></div></article>` }).join(''); }
 document.addEventListener('click', e => {
   const btn = e.target.closest('[data-edit]');
   if (!btn) return;
   editProduct(btn);
 });
 async function editProduct(el) {
-  if (!adminSession) return alert('請先登入後台');
-
-  const id = el.dataset.edit;
-  const p = products.find(x => String(x.id) === String(id));
-  if (!p) return alert('找不到商品');
-
-  const newPrice = prompt('修改價格', p.price);
-  if (newPrice === null) return;
-
-  const newStock = prompt('修改庫存', p.stock);
-  if (newStock === null) return;
-
-  const action = prompt(
-    `商品目前狀態：${p.active === false ? '已結單' : '開放預約'}\n\n請輸入：\n1 = 儲存並開放預約\n2 = 儲存並結單\n3 = 刪除商品`,
-    p.active === false ? '2' : '1'
-  );
-
-  if (action === null) return;
-
-  if (action === '3') {
-    if (!confirm(`確定要刪除「${p.name}」嗎？`)) return;
-    await deleteProduct(id);
-    return;
-  }
-
-  if (action !== '1' && action !== '2') {
-    return alert('請輸入 1、2 或 3');
-  }
-
-  const patch = {
-    price: Math.max(0, Number(newPrice) || 0),
-    stock: Math.max(0, Number(newStock) || 0),
-    active: action === '1'
-  };
-
-  if (ONLINE) {
-    const { error } = await db
-      .from('products')
-      .update(patch)
-      .eq('id', id);
-
-    if (error) return alert('修改商品失敗：' + error.message);
-
-    await refreshAll();
-  } else {
-    Object.assign(p, patch);
-    save(LS.products, products);
-  }
-
-  renderAdmin();
-  renderProducts();
-  alert(action === '2' ? '商品已結單' : '商品修改成功');
-}async function deleteProduct(id) { if (!adminSession) return alert('請先登入後台'); if (!confirm('確定刪除此商品？')) return; if (ONLINE) { const r = await db.from('products').delete().eq('id', id); if (r.error) return alert(r.error.message) } else { products = products.filter(p => String(p.id) !== String(id)); save(LS.products, products) } await refreshAll(); renderAdmin() }
+  if (!adminSession) return alert('請先登入後台'); const id=el.dataset.edit, p=products.find(x=>String(x.id)===String(id)); if(!p)return alert('找不到商品');
+  const newStock=prompt(`修改基礎庫存（單位：${p.unit}）`,p.stock); if(newStock===null)return;
+  const specText=prompt('修改規格：每行「規格名稱|售價|販售單位|扣庫存數」\n例如：單房|350|房|1\n二房|620|組|2\n整箱|1499|箱|5', getVariants(p).map(v=>`${v.name}|${v.price}|${v.unit}|${v.stock_cost}`).join('\n')); if(specText===null)return;
+  const variants=parseVariantText(specText); if(!variants.length)return alert('至少需要一個有效規格');
+  const action=prompt(`商品目前狀態：${p.active===false?'已結單':'開放預約'}\n\n1 = 儲存並開放預約\n2 = 儲存並結單\n3 = 刪除商品`,p.active===false?'2':'1'); if(action===null)return; if(action==='3'){if(confirm(`確定要刪除「${p.name}」嗎？`))await deleteProduct(id);return} if(!['1','2'].includes(action))return alert('請輸入 1、2 或 3');
+  const patch={price:variants[0].price,stock:Math.max(0,Number(newStock)||0),variants,active:action==='1'}; if(ONLINE){const {error}=await db.from('products').update(patch).eq('id',id);if(error)return alert('修改商品失敗：'+error.message);await refreshAll()}else{Object.assign(p,patch);save(LS.products,products)} renderAdmin();renderProducts();alert(action==='2'?'商品已結單':'商品修改成功');
+}
+async function deleteProduct(id) { if (!adminSession) return alert('請先登入後台'); if (!confirm('確定刪除此商品？')) return; if (ONLINE) { const r = await db.from('products').delete().eq('id', id); if (r.error) return alert(r.error.message) } else { products = products.filter(p => String(p.id) !== String(id)); save(LS.products, products) } await refreshAll(); renderAdmin() }
 async function saveSettings() { if (!adminSession) return alert('請先登入後台'); const patch = { location: $('settingLocation').value.trim(), hours: $('settingHours').value.trim(), open: $('settingOpen').value === 'true' }; if (ONLINE) { const r = await db.from('store_settings').upsert({ id: 1, ...patch }); if (r.error) return alert(r.error.message) } else { settings = patch; save(LS.settings, settings) } await refreshAll(); alert('設定已儲存') }
 function exportCSV() { if (!adminSession) return alert('請先登入後台'); const rows = [['預約編號', '時間', '姓名', '電話', '狀態', '取貨時段', '方式', '商品', '金額', '地址', '備註'], ...orders.map(o => [o.id, o.created_at || o.createdAt, o.name, o.phone, o.status, o.pickup_time || o.pickup, o.method, (o.items || []).map(i => `${i.name}x${i.qty}`).join(' / '), o.total, o.address, o.note])]; const csv = '\ufeff' + rows.map(r => r.map(v => `"${String(v ?? '').replaceAll('"', '""')}"`).join(',')).join('\n'); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = `果來好甜訂單-${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(a.href) }
 

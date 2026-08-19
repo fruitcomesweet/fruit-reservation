@@ -101,14 +101,14 @@
     </section>
 
     <section id="ordersPanel" class="panel"><div id="stats" class="stats"></div><div class="toolbar"><select id="statusFilter"><option value="all">全部狀態</option><option>未取</option><option>等待報價</option><option>已確認</option><option>已取</option><option>已取消</option></select><input id="orderSearch" placeholder="搜尋姓名、電話、編號"><button id="exportOrders" class="secondary">匯出 CSV</button></div><div id="orderList"></div></section>
-    <section id="productsPanel" class="panel hidden"><div class="panel-card"><h3>新增商品</h3><div class="form-grid admin-form"><label>商品名稱<input id="newName"></label><label>單位<input id="newUnit" placeholder="斤、箱、顆"></label><label>價格<input id="newPrice" type="number" min="0"></label><label>庫存<input id="newStock" type="number" min="0"></label>
+    <section id="productsPanel" class="panel hidden"><div class="panel-card"><h3>新增商品</h3><div class="form-grid admin-form"><label>商品名稱<input id="newName"></label><label>基礎庫存單位<input id="newUnit" placeholder="例如：房、顆、斤"></label><label>基礎庫存<input id="newStock" type="number" min="0" placeholder="例如：150"></label><input id="newPrice" type="hidden" value="0">
       <label>
   商品照片
   <input id="newImage" type="file" accept="image/*">
 </label>
 <label>
   圖示
-  <input id="newEmoji" maxlength="4" placeholder="🥭"></label><label>商品說明<input id="newDescription"></label></div><button id="addProduct" class="primary compact">新增商品</button></div><div id="productAdminList"></div></section>
+  <input id="newEmoji" maxlength="4" placeholder="🥭"></label><label>商品說明<input id="newDescription"></label></div><div class="variant-editor"><div class="section-head"><div><strong>販售規格</strong><p class="helper">共用上方基礎庫存。例：整箱扣 5 房、二房扣 2 房。</p></div><button id="addVariant" class="secondary compact" type="button">＋ 新增規格</button></div><div class="variant-head"><span>規格名稱</span><span>價格</span><span>販售單位</span><span>扣庫存</span><span></span></div><div id="variantRows"></div></div><button id="addProduct" class="primary compact">新增商品</button></div><div id="productAdminList"></div></section>
   <section id="staffPanel" class="panel hidden">
       <div class="panel-card">
         <div class="section-head compact-head"><div><h3>員工管理</h3><p class="helper">每位夥伴使用自己的 Email 登入。新增前，請先到 Supabase Authentication → Users 建立該帳號。</p></div><span id="staffRoleBadge" class="badge"></span></div>
@@ -130,7 +130,7 @@
 <script src="config.js?v=staff-v2"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script src="app.js?v=qr-pickup-v1"></script>
+<script src="app.js?v=variants-v1"></script>
 <script src="./password-feature.js?v=password-v4"></script>
 </body>
 </html>

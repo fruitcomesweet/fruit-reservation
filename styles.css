@@ -80,3 +80,4 @@
   width:100%;
   margin-bottom:14px;
 }
+.variant-label{margin-top:12px}.variant-label select{margin-top:4px}.variant-editor{margin:16px 0;padding:14px;background:var(--cream);border-radius:14px}.variant-head,.variant-row{display:grid;grid-template-columns:1.4fr 1fr 1fr .8fr 42px;gap:8px;align-items:center;margin-bottom:8px}.variant-head{font-size:12px;font-weight:800;color:var(--muted)}.variant-row input{padding:9px}.variant-remove{padding:9px!important}.variant-admin-summary{margin-top:8px;line-height:1.7}@media(max-width:680px){.variant-head{display:none}.variant-row{grid-template-columns:1fr 1fr}.variant-row .variant-remove{grid-column:2}.variant-row input[data-v-name]{grid-column:1/-1}}
