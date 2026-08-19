@@ -85,10 +85,21 @@ async function lookupMyOrders() {
       return;
     }
 
-    results.innerHTML = data.map((order, index) => `
+    const enrichedData = await Promise.all(
+      data.map(async (order) => {
+        const { data: dailyNumber, error: dailyNumberError } = await db.rpc('get_order_daily_number', {
+          p_order_id: order.id
+        });
+        if (dailyNumberError) console.error(dailyNumberError);
+        return { ...order, daily_number: dailyNumberError ? null : dailyNumber };
+      })
+    );
+
+    results.innerHTML = enrichedData.map((order, index) => `
   <div class="lookup-order-card">
     <strong>${order.name || '果來好甜顧客'}</strong>
     <div>訂單編號：${order.id || ''}</div>
+    ${order.daily_number ? `<div style="margin-top:6px;font-weight:800;font-size:18px;">今日取貨號碼：${order.daily_number} 號</div>` : ''}
     <div>取貨碼：<strong>${order.pickup_code || ''}</strong></div>
     <div>${order.pickup_time || ''}｜${order.method || ''}</div>
     <div>金額：$${Number(order.total || 0).toLocaleString()}</div>
@@ -111,7 +122,7 @@ async function lookupMyOrders() {
   </div>
 `).join('');
 
-    data.forEach((order, index) => {
+    enrichedData.forEach((order, index) => {
       const qrTarget = document.getElementById(`lookupQr-${index}`);
 
       if (window.QRCode && qrTarget) {
@@ -238,6 +249,7 @@ function renderPickupOrder(o) {
    <div><h3>${esc(o.name)}</h3><div class="order-id">${esc(o.phone)}｜${esc(o.id)}</div></div>
    <span class="status-badge">${esc(o.status)}</span>
   </div>
+  ${o.daily_number ? `<div class="pickup-code-line">今日取貨號碼：<strong>${esc(o.daily_number)} 號</strong></div>` : ''}
   <div class="pickup-code-line">取貨碼：<strong>${esc(o.pickup_code || '')}</strong></div>
   <div class="order-lines">${(o.items || []).map(i => `${esc(i.emoji)} ${esc(i.name)} × ${i.qty}`).join('<br>')}</div>
   <div class="cart-line cart-total"><span>商品小計</span><span>${money(o.total)}</span></div>
