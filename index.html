@@ -7,18 +7,29 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>果來好甜｜水果預約保留</title>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css?v=staff-v2">
+  <link rel="stylesheet" href="styles.css?v=ui-v2">
 </head>
 <body>
 <header class="hero">
   <div class="hero-inner">
     <div class="logo">果</div>
     <div><p class="eyebrow">FRUIT COME SWEET</p><h1>今日水果預約保留</h1><p id="todayText" class="muted"></p></div>
-    <button id="openAdmin" class="ghost">店家後台</button>
   </div>
 </header>
 <main class="container">
   <section class="notice card"><div><strong id="storeLocation"></strong><p id="storeHours"></p></div><span id="onlineBadge" class="badge">讀取中</span></section>
+  <section class="card quick-lookup">
+    <div class="order-lookup-box">
+      <h3>查詢我的訂單</h3>
+      <p class="helper">已經下單了嗎？輸入手機號碼即可快速查看今天的訂單與 QR Code。</p>
+      <div class="order-lookup-row">
+        <input id="lookupPhone" inputmode="numeric" maxlength="10" placeholder="09xxxxxxxx">
+        <button id="lookupMyOrders" class="secondary" type="button">查詢今日訂單</button>
+      </div>
+      <p id="lookupMessage" class="form-message"></p>
+      <div id="lookupResults"></div>
+    </div>
+  </section>
   <section>
     <div class="section-head"><div><p class="eyebrow">TODAY'S FRUIT</p><h2>今天想留哪一份甜？</h2></div><span id="openStatus" class="tiny"></span></div>
     <div id="productGrid" class="product-grid"></div>
@@ -40,26 +51,6 @@
       <label class="consent"><input id="agree" type="checkbox" required><span>我確認會在今日營業時間內取貨，若臨時無法前往會主動告知。</span></label>
       <button class="primary" type="submit">送出預約保留</button><p id="formMessage" class="form-message"></p>
     </form>
-<div class="order-lookup-box">
-  <h3>查詢我的訂單</h3>
-  <p class="helper">輸入下單時的手機號碼，即可查詢今天的訂單與 QR Code。</p>
-
-  <div class="order-lookup-row">
-    <input
-      id="lookupPhone"
-      inputmode="numeric"
-      maxlength="10"
-      placeholder="09xxxxxxxx"
-    >
-    <button id="lookupMyOrders" class="secondary" type="button">
-      查詢今日訂單
-    </button>
-  </div>
-
-  <p id="lookupMessage" class="form-message"></p>
-  <div id="lookupResults"></div>
-</div>
-
 </section>
 </main>
 <dialog id="successDialog" class="dialog"><div id="successContent"></div><button id="closeSuccess" class="primary">完成</button></dialog>
@@ -130,7 +121,7 @@
 <script src="config.js?v=staff-v2"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script src="app.js?v=variants-v1"></script>
+<script src="app.js?v=ui-v2"></script>
 <script src="./password-feature.js?v=password-v4"></script>
 </body>
 </html>
