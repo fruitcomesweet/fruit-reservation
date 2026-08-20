@@ -77,7 +77,7 @@ function bind() {
   document.querySelectorAll('input[name="method"]').forEach(r => r.onchange = () => { $('deliveryFields').classList.toggle('hidden', !(r.checked && r.value === 'Lalamove配送')) }); $('reservationForm').onsubmit = submitOrder; const adminBtn = $('openAdmin'); if (adminBtn) adminBtn.onclick = openAdminDialog; if (location.hash === '#admin') openAdminDialog(); window.addEventListener('hashchange', () => { if (location.hash === '#admin') openAdminDialog(); }); $('closeAdmin').onclick = () => $('adminDialog').close(); $('closeSuccess').onclick = () => $('successDialog').close(); $('unlockAdmin').onclick = unlock; $('logoutAdmin').onclick = logout; document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab)); $('statusFilter').onchange = renderOrders; $('orderSearch').oninput = renderOrders; $('exportOrders').onclick = exportCSV; $('addProduct').onclick = addProduct; $('addVariant').onclick = () => addVariantRow(); $('saveSettings').onclick = saveSettings; $('saveStaff').onclick = saveStaff; $('startQrScanner').onclick = startQrScanner; $('stopQrScanner').onclick = stopQrScanner; $('lookupPickupCode').onclick = () => lookupPickupCode($('manualPickupCode').value); $('manualPickupCode').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); lookupPickupCode(e.currentTarget.value) } }
 }
 async function submitOrder(e) {
-  e.preventDefault(); $('formMessage').textContent = ''; if (!settings.open) return fail('目前暫停預約。'); const entries = Object.values(cart); if (!entries.length) return fail('請先選擇至少一項商品。'); const name = $('name').value.trim(), phone = $('phone').value.trim(), pickup = $('pickupTime').value, method = document.querySelector('input[name="method"]:checked').value, address = $('address').value.trim(); if (!name || !/^09\d{8}$/.test(phone) || !pickup || !$('agree').checked) return fail('請確認姓名、10碼手機、取貨時間與同意事項。'); if (method === 'Lalamove配送' && !address) return fail('請填寫配送地址。'); const items = entries.map(x => { const p = products.find(y => String(y.id) === String(x.product_id)); return { product_id:p.id, name:p.name, unit:x.unit, price:x.price, qty:x.qty, emoji:p.emoji, variant_id:x.variant_id, variant_name:x.variant_name, stock_cost:x.stock_cost } }); const costs={}; for (const i of items) costs[i.product_id]=(costs[i.product_id]||0)+i.qty*i.stock_cost; for (const [pid,cost] of Object.entries(costs)) { const p=products.find(x=>String(x.id)===String(pid)); if(!p||cost>p.stock) return fail(`${p?.name||'商品'} 庫存不足。`) } const total = items.reduce((s, i) => s + i.price * i.qty, 0), status = method === 'Lalamove配送' ? '等待報價' : '未取'; let order;
+  e.preventDefault(); $('formMessage').textContent = ''; if (!settings.open) return fail('目前暫停預約。'); const entries = Object.values(cart); if (!entries.length) return fail('請先選擇至少一項商品。'); const name = $('name').value.trim(), phone = $('phone').value.trim(), pickup = $('pickupTime').value, method = document.querySelector('input[name="method"]:checked').value, address = ''; if (!name || !/^09\d{8}$/.test(phone) || !pickup || !$('agree').checked) return fail('請確認姓名、10碼手機、取貨時間與同意事項。'); const items = entries.map(x => { const p = products.find(y => String(y.id) === String(x.product_id)); return { product_id:p.id, name:p.name, unit:x.unit, price:x.price, qty:x.qty, emoji:p.emoji, variant_id:x.variant_id, variant_name:x.variant_name, stock_cost:x.stock_cost } }); const costs={}; for (const i of items) costs[i.product_id]=(costs[i.product_id]||0)+i.qty*i.stock_cost; for (const [pid,cost] of Object.entries(costs)) { const p=products.find(x=>String(x.id)===String(pid)); if(!p||cost>p.stock) return fail(`${p?.name||'商品'} 庫存不足。`) } const total = items.reduce((s, i) => s + i.price * i.qty, 0), status = method === 'Lalamove配送' ? '等待報價' : '未取'; let order;
   try { if (ONLINE) { const rpc = await db.rpc('create_reservation', { p_name: name, p_phone: phone, p_line_name: $('lineName').value.trim(), p_pickup_time: pickup, p_method: method, p_address: address, p_note: $('note').value.trim(), p_status: status, p_items: items }); if (rpc.error) throw rpc.error; order = { ...rpc.data, items } } else { const id = `GL${new Date().toISOString().slice(5, 10).replace('-', '')}-${String(orders.length + 1).padStart(3, '0')}`; order = { id, created_at: new Date().toISOString(), name, phone, line_name: $('lineName').value.trim(), pickup_time: pickup, method, address, note: $('note').value.trim(), status, total, items }; orders.unshift(order); if (method === '現場自取') items.forEach(i => products.find(p => String(p.id) === String(i.product_id)).stock -= i.qty * (i.stock_cost || 1)); save(LS.orders, orders); save(LS.products, products) } } catch (err) { console.error(err); return fail('送出失敗，請稍後再試或聯絡小編。') }
 const dailyResult = await db.rpc('get_order_daily_number', {
   p_order_id: order.id
@@ -169,7 +169,7 @@ async function lookupMyOrders() {
 }
 function showSuccess(o) {
   const pickupCode = o.pickup_code || o.id;
-  $('successContent').innerHTML = `<div style="font-size:48px;text-align:center">🍊</div><h2 style="text-align:center">已收到預約</h2><p style="text-align:center">請截圖保存 QR Code，取貨時出示給店員</p><div id="customerQrCode" class="customer-qr"></div><div class="success-number">${esc(pickupCode)}</div>${o.items.map(i => `<div class="cart-line"><span>${esc(i.emoji)} ${esc(i.name)}${i.variant_name ? `｜${esc(i.variant_name)}` : ''} × ${i.qty}（${money(i.price)} / ${esc(i.unit)}）</span><strong>${money(i.price * i.qty)}</strong></div>`).join('')}<div class="cart-line cart-total"><span>商品小計</span><span>${money(o.total)}</span></div><div class="cart-line"><span>取貨</span><span>${esc(o.pickup_time || o.pickup)}／${esc(o.method)}</span></div><div class="cart-line"><span>狀態</span><span>${esc(o.status)}</span></div><p class="helper">QR Code 無法掃描時，也可以提供上方取貨碼。</p>`;
+  $('successContent').innerHTML = `<div style="font-size:48px;text-align:center">🍊</div><h2 style="text-align:center">已收到預約</h2><p style="text-align:center">請截圖保存 QR Code，取貨時出示給店員</p><div id="customerQrCode" class="customer-qr"></div><div class="success-number">${esc(pickupCode)}</div>${o.items.map(i => `<div class="cart-line"><span>${esc(i.emoji)} ${esc(i.name)}${i.variant_name ? `｜${esc(i.variant_name)}` : ''} × ${i.qty}（${money(i.price)} / ${esc(i.unit)}）</span><strong>${money(i.price * i.qty)}</strong></div>`).join('')}<div class="cart-line cart-total"><span>商品小計</span><span>${money(o.total)}</span></div><div class="cart-line"><span>取貨</span><span>${esc(o.pickup_time || o.pickup)}／${esc(o.method)}</span></div><div class="cart-line"><span>狀態</span><span>${esc(o.status)}</span></div>${o.method === 'Lalamove配送' ? `<div class="lala-success-note"><strong>🚗 Lalamove 配送提醒</strong><p>請截圖本頁的訂購商品明細，並把以下配送資訊一起傳到官方 LINE：<b>@073nnpck</b></p><div>📌 配送地址：</div><div>💁🏻 收件人名字：</div><div>📱 收件人手機：</div><div>⏰ 方便配送時間：</div><div>🚗 配送備註：如放管理室、抵達後撥電話、需親自取件等。</div></div>` : ''}<p class="helper">QR Code 無法掃描時，也可以提供上方取貨碼。</p>`;
   const dailyNumber = o.daily_number;
 
 if (dailyNumber) {
@@ -381,6 +381,7 @@ async function addProduct() {
   const price = Number($('newPrice').value || 0);
   const stock = Number($('newStock').value);
   const emoji = $('newEmoji').value.trim();
+  const description = $('newDescription').value.trim();
   const imageFile = $('newImage')?.files?.[0];
 
   const variants = readVariantRows();
@@ -400,6 +401,7 @@ async function addProduct() {
       stock,
       variants,
       emoji,
+      description,
       image_url
     };
 
@@ -414,7 +416,7 @@ async function addProduct() {
       save(LS.products, products);
     }
 
-    $('newImage').value = ''; resetVariantRows();
+    $('newImage').value = ''; $('newDescription').value = ''; resetVariantRows();
     renderAdmin();
     alert('商品新增成功');
   } catch (err) {
@@ -430,10 +432,11 @@ document.addEventListener('click', e => {
 async function editProduct(el) {
   if (!adminSession) return alert('請先登入後台'); const id=el.dataset.edit, p=products.find(x=>String(x.id)===String(id)); if(!p)return alert('找不到商品');
   const newStock=prompt(`修改基礎庫存（單位：${p.unit}）`,p.stock); if(newStock===null)return;
+  const newDescription=prompt('修改商品說明（可留空）',p.description||''); if(newDescription===null)return;
   const specText=prompt('修改規格：每行「規格名稱|售價|販售單位|扣庫存數」\n例如：單房|350|房|1\n二房|620|組|2\n整箱|1499|箱|5', getVariants(p).map(v=>`${v.name}|${v.price}|${v.unit}|${v.stock_cost}`).join('\n')); if(specText===null)return;
   const variants=parseVariantText(specText); if(!variants.length)return alert('至少需要一個有效規格');
   const action=prompt(`商品目前狀態：${p.active===false?'已結單':'開放預約'}\n\n1 = 儲存並開放預約\n2 = 儲存並結單\n3 = 刪除商品`,p.active===false?'2':'1'); if(action===null)return; if(action==='3'){if(confirm(`確定要刪除「${p.name}」嗎？`))await deleteProduct(id);return} if(!['1','2'].includes(action))return alert('請輸入 1、2 或 3');
-  const patch={price:variants[0].price,stock:Math.max(0,Number(newStock)||0),variants,active:action==='1'}; if(ONLINE){const {error}=await db.from('products').update(patch).eq('id',id);if(error)return alert('修改商品失敗：'+error.message);await refreshAll()}else{Object.assign(p,patch);save(LS.products,products)} renderAdmin();renderProducts();alert(action==='2'?'商品已結單':'商品修改成功');
+  const patch={price:variants[0].price,stock:Math.max(0,Number(newStock)||0),description:newDescription.trim(),variants,active:action==='1'}; if(ONLINE){const {error}=await db.from('products').update(patch).eq('id',id);if(error)return alert('修改商品失敗：'+error.message);await refreshAll()}else{Object.assign(p,patch);save(LS.products,products)} renderAdmin();renderProducts();alert(action==='2'?'商品已結單':'商品修改成功');
 }
 async function deleteProduct(id) { if (!adminSession) return alert('請先登入後台'); if (!confirm('確定刪除此商品？')) return; if (ONLINE) { const r = await db.from('products').delete().eq('id', id); if (r.error) return alert(r.error.message) } else { products = products.filter(p => String(p.id) !== String(id)); save(LS.products, products) } await refreshAll(); renderAdmin() }
 async function saveSettings() { if (!adminSession) return alert('請先登入後台'); const patch = { location: $('settingLocation').value.trim(), hours: $('settingHours').value.trim(), open: $('settingOpen').value === 'true' }; if (ONLINE) { const r = await db.from('store_settings').upsert({ id: 1, ...patch }); if (r.error) return alert(r.error.message) } else { settings = patch; save(LS.settings, settings) } await refreshAll(); alert('設定已儲存') }

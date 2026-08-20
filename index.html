@@ -46,7 +46,18 @@
         <label>取貨時段<span>*</span><select id="pickupTime" required><option value="">請選擇</option><option>14:00–16:00</option><option>16:00–18:00</option><option>18:00–19:30</option><option>19:30後（已與店家約好）</option></select></label>
       </div>
       <fieldset><legend>取貨方式<span>*</span></legend><div class="choice-row"><label class="choice"><input type="radio" name="method" value="現場自取" checked>🛍 現場自取</label><label class="choice"><input type="radio" name="method" value="Lalamove配送">🚗 Lalamove 配送</label></div></fieldset>
-      <div id="deliveryFields" class="hidden"><label>配送地址<span>*</span><input id="address" placeholder="請填完整地址"></label><p class="helper">配送會先進入「等待報價」，確認運費後才正式保留庫存。</p></div>
+      <div id="deliveryFields" class="hidden lala-info">
+        <strong>🚗 Lalamove 配送提醒</strong>
+        <p>送出訂單後，請截圖「訂購完成的商品明細」，並把以下配送資訊一起傳到官方 LINE：<b>@073nnpck</b></p>
+        <div class="lala-list">
+          <div>📌 配送地址：</div>
+          <div>💁🏻 收件人名字：</div>
+          <div>📱 收件人手機：</div>
+          <div>⏰ 方便配送時間：</div>
+          <div>🚗 配送備註：有需要交代司機什麼資訊嗎？例如放管理室、抵達後撥電話、需親自取件。</div>
+        </div>
+        <p class="helper">配送會先進入「等待報價」，確認運費後才正式保留庫存。</p>
+      </div>
       <label>備註<textarea id="note" maxlength="120" rows="3" placeholder="例如：幫我挑熟一點、18:30後到"></textarea></label>
       <label class="consent"><input id="agree" type="checkbox" required><span>我確認會在今日營業時間內取貨，若臨時無法前往會主動告知。</span></label>
       <button class="primary" type="submit">送出預約保留</button><p id="formMessage" class="form-message"></p>
