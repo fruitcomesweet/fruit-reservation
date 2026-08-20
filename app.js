@@ -4,6 +4,7 @@ const db = ONLINE ? window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_
 const LS = { products: 'fruitFormal_products', orders: 'fruitFormal_orders', settings: 'fruitFormal_settings' };
 const defaults = { products: [{ id: 'mango', name: '金煌芒果', unit: '斤', price: 33, stock: 60, emoji: '🥭', description: '特A級，保留需最少3斤', active: true, sort_order: 1 }, { id: 'durian', name: '赤皇榴槤', unit: '顆', price: 499, stock: 20, emoji: '🌰', description: '明星牌特A果，單顆販售', active: true, sort_order: 2 }, { id: 'dragon', name: '白肉火龍果', unit: '斤', price: 39, stock: 90, emoji: '🐉', description: '清甜爽口，限量供應', active: true, sort_order: 3 }], settings: { location: '📍 板橋重慶黃昏市場', hours: '取貨時間 14:00–19:30｜商品限當日取貨', open: true } };
 let products = [], orders = [], settings = {}, cart = {}, adminSession = null, currentStaff = null, staffMembers = [], qrScanner = null, currentPickupOrder = null;
+const selectedVariantByProduct = {}; // 記住每個商品目前選擇的規格，重新渲染時不跳回第一個
 const $ = id => document.getElementById(id), money = n => `$${Number(n).toLocaleString('zh-TW')}`, clone = x => JSON.parse(JSON.stringify(x));
 const load = (k, f) => { try { return JSON.parse(localStorage.getItem(k)) ?? clone(f) } catch { return clone(f) } };
 const save = (k, v) => localStorage.setItem(k, JSON.stringify(v));
@@ -39,11 +40,18 @@ function getVariants(p) {
 function cartKey(productId, variantId) { return `${productId}::${variantId}`; }
 function renderProducts() {
   const visible = products.filter(p => p.active); $('emptyProducts').classList.toggle('hidden', visible.length); $('productGrid').innerHTML = visible.map(p => {
-    const variants = getVariants(p), first = variants[0], sold = p.stock < Math.min(...variants.map(v => v.stock_cost));
-    const options = variants.map(v => `<option value="${esc(v.id)}">${esc(v.name)}｜${money(v.price)} / ${esc(v.unit)}</option>`).join('');
-    return `<article class="product ${sold ? 'sold' : ''}" data-product-card="${p.id}"><div class="product-icon">${p.image_url ? `<img src="${esc(p.image_url)}" alt="${esc(p.name)}" class="product-image">` : esc(p.emoji || '🍎')}</div><h3>${esc(p.name)}</h3>${p.description ? `<p class="product-desc">${esc(p.description)}</p>` : ''}<label class="variant-label">選擇規格<select data-variant-select="${p.id}">${options}</select></label><div class="meta"><span class="price" data-variant-price="${p.id}">${money(first.price)} / ${esc(first.unit)}</span><span class="stock">基礎庫存剩 ${p.stock} ${esc(p.unit)}</span></div><div class="qty"><button data-dec-product="${p.id}" ${sold ? 'disabled' : ''}>−</button><strong data-product-qty="${p.id}">0</strong><button data-inc-product="${p.id}" ${sold ? 'disabled' : ''}>＋</button></div></article>`;
+    const variants = getVariants(p);
+    const rememberedId = selectedVariantByProduct[String(p.id)];
+    const selected = variants.find(v => v.id === rememberedId) || variants[0];
+    selectedVariantByProduct[String(p.id)] = selected.id;
+    const sold = p.stock < Math.min(...variants.map(v => v.stock_cost));
+    const options = variants.map(v => `<option value="${esc(v.id)}" ${v.id === selected.id ? 'selected' : ''}>${esc(v.name)}｜${money(v.price)} / ${esc(v.unit)}</option>`).join('');
+    return `<article class="product ${sold ? 'sold' : ''}" data-product-card="${p.id}"><div class="product-icon">${p.image_url ? `<img src="${esc(p.image_url)}" alt="${esc(p.name)}" class="product-image">` : esc(p.emoji || '🍎')}</div><h3>${esc(p.name)}</h3>${p.description ? `<p class="product-desc">${esc(p.description)}</p>` : ''}<label class="variant-label">選擇規格<select data-variant-select="${p.id}">${options}</select></label><div class="meta"><span class="price" data-variant-price="${p.id}">${money(selected.price)} / ${esc(selected.unit)}</span><span class="stock">基礎庫存剩 ${p.stock} ${esc(p.unit)}</span></div><div class="qty"><button data-dec-product="${p.id}" ${sold ? 'disabled' : ''}>−</button><strong data-product-qty="${p.id}">0</strong><button data-inc-product="${p.id}" ${sold ? 'disabled' : ''}>＋</button></div></article>`;
   }).join('');
-  document.querySelectorAll('[data-variant-select]').forEach(s => s.onchange = () => updateVariantCard(s.dataset.variantSelect));
+  document.querySelectorAll('[data-variant-select]').forEach(s => s.onchange = () => {
+    selectedVariantByProduct[String(s.dataset.variantSelect)] = s.value;
+    updateVariantCard(s.dataset.variantSelect);
+  });
   document.querySelectorAll('[data-inc-product]').forEach(b => b.onclick = () => changeVariantQty(b.dataset.incProduct, 1));
   document.querySelectorAll('[data-dec-product]').forEach(b => b.onclick = () => changeVariantQty(b.dataset.decProduct, -1));
   visible.forEach(p => updateVariantCard(p.id));
