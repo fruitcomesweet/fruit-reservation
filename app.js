@@ -82,7 +82,7 @@ async function openAdminDialog() {
 function bind() {
   const lookupBtn = $('lookupMyOrders');
   if (lookupBtn) lookupBtn.onclick = lookupMyOrders;
-  document.querySelectorAll('input[name="method"]').forEach(r => r.onchange = () => { $('deliveryFields').classList.toggle('hidden', !(r.checked && r.value === 'Lalamove配送')) }); $('reservationForm').onsubmit = submitOrder; const adminBtn = $('openAdmin'); if (adminBtn) adminBtn.onclick = openAdminDialog; if (location.hash === '#admin') openAdminDialog(); window.addEventListener('hashchange', () => { if (location.hash === '#admin') openAdminDialog(); }); $('closeAdmin').onclick = () => $('adminDialog').close(); $('closeSuccess').onclick = () => $('successDialog').close(); $('unlockAdmin').onclick = unlock; $('logoutAdmin').onclick = logout; document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab)); $('statusFilter').onchange = renderOrders; $('orderSearch').oninput = renderOrders; $('exportOrders').onclick = exportCSV; $('addProduct').onclick = addProduct; $('addVariant').onclick = () => addVariantRow(); $('saveSettings').onclick = saveSettings; $('saveStaff').onclick = saveStaff; $('startQrScanner').onclick = startQrScanner; $('stopQrScanner').onclick = stopQrScanner; $('lookupPickupCode').onclick = () => lookupPickupCode($('manualPickupCode').value); $('manualPickupCode').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); lookupPickupCode(e.currentTarget.value) } }
+  document.querySelectorAll('input[name="method"]').forEach(r => r.onchange = () => { $('deliveryFields').classList.toggle('hidden', !(r.checked && r.value === 'Lalamove配送')) }); $('reservationForm').onsubmit = submitOrder; const adminBtn = $('openAdmin'); if (adminBtn) adminBtn.onclick = openAdminDialog; if (location.hash === '#admin') openAdminDialog(); window.addEventListener('hashchange', () => { if (location.hash === '#admin') openAdminDialog(); }); $('closeAdmin').onclick = () => $('adminDialog').close(); $('closeSuccess').onclick = () => $('successDialog').close(); $('unlockAdmin').onclick = unlock; $('logoutAdmin').onclick = logout; document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab)); $('statusFilter').onchange = renderOrders; $('orderSearch').oninput = renderOrders; $('exportOrders').onclick = exportCSV; $('addProduct').onclick = addProduct; $('addVariant').onclick = () => addVariantRow(); $('saveSettings').onclick = saveSettings; $('saveStaff').onclick = saveStaff; $('startQrScanner').onclick = startQrScanner; $('stopQrScanner').onclick = stopQrScanner; $('lookupPickupCode').onclick = () => lookupPickupCode($('manualPickupCode').value); $('manualPickupCode').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); lookupPickupCode(e.currentTarget.value) } }; $('closeEditProduct').onclick = () => $('editProductDialog').close(); $('editAddVariant').onclick = () => addEditVariantRow(); $('saveEditProduct').onclick = saveEditProduct; $('deleteProductFromEdit').onclick = deleteProductFromEdit; $('editImage').onchange = e => { const file = e.currentTarget.files?.[0]; if (!file) return; const url = URL.createObjectURL(file); $('editImagePreview').innerHTML = `<img src="${url}" alt="新商品照片預覽">`; }
 }
 async function submitOrder(e) {
   e.preventDefault(); $('formMessage').textContent = ''; if (!settings.open) return fail('目前暫停預約。'); const entries = Object.values(cart); if (!entries.length) return fail('請先選擇至少一項商品。'); const name = $('name').value.trim(), phone = $('phone').value.trim(), pickup = $('pickupTime').value, method = document.querySelector('input[name="method"]:checked').value, address = ''; if (!name || !/^09\d{8}$/.test(phone) || !pickup || !$('agree').checked) return fail('請確認姓名、10碼手機、取貨時間與同意事項。'); const items = entries.map(x => { const p = products.find(y => String(y.id) === String(x.product_id)); return { product_id:p.id, name:p.name, unit:x.unit, price:x.price, qty:x.qty, emoji:p.emoji, variant_id:x.variant_id, variant_name:x.variant_name, stock_cost:x.stock_cost } }); const costs={}; for (const i of items) costs[i.product_id]=(costs[i.product_id]||0)+i.qty*i.stock_cost; for (const [pid,cost] of Object.entries(costs)) { const p=products.find(x=>String(x.id)===String(pid)); if(!p||cost>p.stock) return fail(`${p?.name||'商品'} 庫存不足。`) } const total = items.reduce((s, i) => s + i.price * i.qty, 0), status = method === 'Lalamove配送' ? '等待報價' : '未取'; let order;
@@ -177,29 +177,24 @@ async function lookupMyOrders() {
 }
 function showSuccess(o) {
   const pickupCode = o.pickup_code || o.id;
-  $('successContent').innerHTML = `<div style="font-size:48px;text-align:center">🍊</div><h2 style="text-align:center">已收到預約</h2><p style="text-align:center">請截圖保存 QR Code，取貨時出示給店員</p><div id="customerQrCode" class="customer-qr"></div><div class="success-number">${esc(pickupCode)}</div>${o.items.map(i => `<div class="cart-line"><span>${esc(i.emoji)} ${esc(i.name)}${i.variant_name ? `｜${esc(i.variant_name)}` : ''} × ${i.qty}（${money(i.price)} / ${esc(i.unit)}）</span><strong>${money(i.price * i.qty)}</strong></div>`).join('')}<div class="cart-line cart-total"><span>商品小計</span><span>${money(o.total)}</span></div><div class="cart-line"><span>取貨</span><span>${esc(o.pickup_time || o.pickup)}／${esc(o.method)}</span></div><div class="cart-line"><span>狀態</span><span>${esc(o.status)}</span></div>${o.method === 'Lalamove配送' ? `<div class="lala-success-note"><strong>🚗 Lalamove 配送提醒</strong><p>請截圖本頁的訂購商品明細，並把以下配送資訊一起傳到官方 LINE：<b>@073nnpck</b></p><div>📌 配送地址：</div><div>💁🏻 收件人名字：</div><div>📱 收件人手機：</div><div>⏰ 方便配送時間：</div><div>🚗 配送備註：如放管理室、抵達後撥電話、需親自取件等。</div></div>` : ''}<p class="helper">QR Code 無法掃描時，也可以提供上方取貨碼。</p>`;
   const dailyNumber = o.daily_number;
-
-if (dailyNumber) {
-  $('successContent').insertAdjacentHTML(
-    'afterbegin',
-    `
-      <div style="
-        text-align:center;
-        margin:10px 0 22px;
-        padding:18px;
-        background:#fff7ed;
-        border-radius:18px;
-      ">
-        <div style="font-size:18px;font-weight:700;">今日取貨號碼</div>
-        <div style="font-size:64px;font-weight:900;line-height:1.15;">
-          ${dailyNumber}
-        </div>
-        <div style="font-size:16px;color:#777;">號</div>
-      </div>
-    `
-  );
-}
+  $('successContent').innerHTML = `
+    <div class="success-head">
+      <div class="success-fruit">🍊</div>
+      <h2>已收到預約</h2>
+      ${dailyNumber ? `<div class="daily-number-card"><span>今日取貨號碼</span><strong>${esc(dailyNumber)}</strong><small>號</small></div>` : ''}
+      <p>請截圖保存 QR Code，取貨時出示給店員</p>
+    </div>
+    <div id="customerQrCode" class="customer-qr"></div>
+    <div class="success-number">${esc(pickupCode)}</div>
+    <div class="success-items">
+      ${o.items.map(i => `<div class="cart-line"><span>${esc(i.emoji)} ${esc(i.name)}${i.variant_name ? `｜${esc(i.variant_name)}` : ''} × ${i.qty}（${money(i.price)} / ${esc(i.unit)}）</span><strong>${money(i.price * i.qty)}</strong></div>`).join('')}
+    </div>
+    <div class="cart-line cart-total"><span>商品小計</span><span>${money(o.total)}</span></div>
+    <div class="cart-line"><span>取貨</span><span>${esc(o.pickup_time || o.pickup)}／${esc(o.method)}</span></div>
+    <div class="cart-line"><span>狀態</span><span>${esc(o.status)}</span></div>
+    ${o.method === 'Lalamove配送' ? `<div class="lala-success-note"><strong>🚗 Lalamove 配送提醒</strong><p>請截圖本頁的訂購商品明細，並把以下配送資訊一起傳到官方 LINE：<b>@073nnpck</b></p><div>📌 配送地址：</div><div>💁🏻 收件人名字：</div><div>📱 收件人手機：</div><div>⏰ 方便配送時間：</div><div>🚗 配送備註：如放管理室、抵達後撥電話、需親自取件等。</div></div>` : ''}
+    <p class="helper">QR Code 無法掃描時，也可以提供上方取貨碼。</p>`;
   $('successDialog').showModal();
   const qrTarget = $('customerQrCode');
   if (window.QRCode && qrTarget) new QRCode(qrTarget, { text: String(pickupCode), width: 190, height: 190, correctLevel: QRCode.CorrectLevel.M });
@@ -336,11 +331,40 @@ function updateAdminView() {
 function switchTab(tab) { if (tab === 'staff' && currentStaff?.role !== 'owner') return; if (tab !== 'pickup') stopQrScanner(); document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));['orders', 'pickup', 'products', 'staff', 'settings'].forEach(x => $(x + 'Panel').classList.toggle('hidden', x !== tab)); renderAdmin() }
 function renderAdmin() { renderStats(); renderOrders(); renderProductAdmin(); applySettings(); if (currentStaff?.role === 'owner') refreshStaff().then(renderStaff) }
 function renderStats() { const revenue = orders.filter(o => o.status === '已取').reduce((s, o) => s + Number(o.total), 0); $('stats').innerHTML = `<div class="stat"><strong>${orders.length}</strong><span>今日訂單</span></div><div class="stat"><strong>${orders.filter(o => o.status === '未取').length}</strong><span>尚未取貨</span></div><div class="stat"><strong>${orders.filter(o => o.status === '等待報價').length}</strong><span>等待報價</span></div><div class="stat"><strong>${money(revenue)}</strong><span>已取營業額</span></div>` }
-function renderOrders() { const f = $('statusFilter').value, q = $('orderSearch').value.trim().toLowerCase(), list = orders.filter(o => (f === 'all' || o.status === f) && (!q || `${o.id}${o.name}${o.phone}`.toLowerCase().includes(q))); $('orderList').innerHTML = list.length ? list.map(o => `<article class="order-item"><div class="order-top"><div>
-  <strong>${esc(o.name)}</strong>
-  <div class="order-id">${esc(o.phone)}｜${esc(o.id)}</div>
-  ${o.daily_number ? `<div style="margin-top:6px;font-weight:800;font-size:18px;">今日取貨號碼：${esc(o.daily_number)} 號</div>` : ''}
-</div><span class="status-badge">${esc(o.status)}</span></div><div class="order-lines">${(o.items || []).map(i => `${esc(i.emoji)} ${esc(i.name)}${i.variant_name ? `｜${esc(i.variant_name)}` : ''} × ${i.qty}（${money(i.price)} / ${esc(i.unit)}）`).join('、')}<br>${esc(o.pickup_time || o.pickup)}｜${esc(o.method)}｜${money(o.total)}${o.note ? `<br>備註：${esc(o.note)}` : ''}</div><div class="order-actions">${['未取', '等待報價', '已確認', '已取', '已取消'].map(s => `<button data-order="${o.id}" data-status="${s}">${s}</button>`).join('')}</div></article>`).join('') : '<div class="empty">目前沒有符合條件的訂單。</div>'; document.querySelectorAll('[data-order]').forEach(b => b.onclick = () => updateOrder(b.dataset.order, b.dataset.status)); renderStats() }
+function renderOrders() {
+  const f = $('statusFilter').value;
+  const q = $('orderSearch').value.trim().toLowerCase();
+  const list = orders.filter(o => (f === 'all' || o.status === f) && (!q || `${o.id}${o.name}${o.phone}`.toLowerCase().includes(q)));
+  $('orderList').innerHTML = list.length ? list.map(o => {
+    const itemRows = (o.items || []).map(i => `
+      <div class="admin-order-item-row">
+        <div class="admin-order-item-main">
+          <span class="admin-order-emoji">${esc(i.emoji || '🍎')}</span>
+          <div><strong>${esc(i.name)}</strong>${i.variant_name ? `<small>${esc(i.variant_name)}</small>` : ''}</div>
+        </div>
+        <div class="admin-order-item-qty">× ${i.qty}</div>
+        <div class="admin-order-item-price">${money(i.price)} / ${esc(i.unit)}</div>
+      </div>`).join('');
+    return `<article class="order-item admin-order-card">
+      <div class="admin-order-card-head">
+        <div class="admin-order-number">${o.daily_number ? `<span>今日取貨號碼</span><strong>${esc(o.daily_number)} 號</strong>` : '<span>訂單</span><strong>未編號</strong>'}</div>
+        <span class="status-badge status-${esc(o.status)}">${esc(o.status)}</span>
+      </div>
+      <div class="admin-order-customer">
+        <strong>${esc(o.name)}</strong>
+        <span>${esc(o.phone)}</span>
+        <span class="admin-order-id">${esc(o.id)}</span>
+      </div>
+      <div class="admin-order-meta"><span>⏰ ${esc(o.pickup_time || o.pickup)}</span><span>${o.method === 'Lalamove配送' ? '🚗' : '🛍'} ${esc(o.method)}</span></div>
+      <div class="admin-order-items">${itemRows || '<div class="helper">沒有商品明細</div>'}</div>
+      ${o.note ? `<div class="admin-order-note"><strong>備註</strong><span>${esc(o.note)}</span></div>` : ''}
+      <div class="admin-order-total"><span>訂單金額</span><strong>${money(o.total)}</strong></div>
+      <div class="order-actions">${['未取', '等待報價', '已確認', '已取', '已取消'].map(st => `<button class="${o.status === st ? 'is-current' : ''}" data-order="${o.id}" data-status="${st}">${st}</button>`).join('')}</div>
+    </article>`;
+  }).join('') : '<div class="empty">目前沒有符合條件的訂單。</div>';
+  document.querySelectorAll('[data-order]').forEach(b => b.onclick = () => updateOrder(b.dataset.order, b.dataset.status));
+  renderStats();
+}
 async function updateOrder(id, status) { if (!adminSession) return alert('請先登入後台'); if (ONLINE) { const r = await db.rpc('update_order_status', { p_order_id: id, p_new_status: status }); if (r.error) return alert(r.error.message) } else { const o = orders.find(x => x.id === id); o.status = status; save(LS.orders, orders) } await refreshAll(); renderAdmin() }
 async function uploadProductImage(file) {
   if (!file) return null;
@@ -437,14 +461,93 @@ document.addEventListener('click', e => {
   if (!btn) return;
   editProduct(btn);
 });
+function addEditVariantRow(values = {}) {
+  const box = $('editVariantRows');
+  const div = document.createElement('div');
+  div.className = 'variant-row';
+  div.innerHTML = `<input data-ev-name placeholder="規格，例如：單房" value="${esc(values.name || '')}"><input data-ev-price type="number" min="0" placeholder="價格" value="${values.price ?? ''}"><input data-ev-unit placeholder="販售單位，例如：房" value="${esc(values.unit || '')}"><input data-ev-cost type="number" min="1" placeholder="扣庫存" value="${values.stock_cost || 1}"><button type="button" class="secondary variant-remove">×</button>`;
+  div.querySelector('.variant-remove').onclick = () => { if (box.children.length > 1) div.remove(); };
+  box.appendChild(div);
+}
+function readEditVariantRows() {
+  return [...document.querySelectorAll('#editVariantRows .variant-row')].map((r, idx) => ({
+    id: `v${idx + 1}`,
+    name: r.querySelector('[data-ev-name]').value.trim(),
+    price: Number(r.querySelector('[data-ev-price]').value),
+    unit: r.querySelector('[data-ev-unit]').value.trim(),
+    stock_cost: Math.max(1, Number(r.querySelector('[data-ev-cost]').value) || 1)
+  })).filter(v => v.name && v.unit && v.price >= 0);
+}
 async function editProduct(el) {
-  if (!adminSession) return alert('請先登入後台'); const id=el.dataset.edit, p=products.find(x=>String(x.id)===String(id)); if(!p)return alert('找不到商品');
-  const newStock=prompt(`修改基礎庫存（單位：${p.unit}）`,p.stock); if(newStock===null)return;
-  const newDescription=prompt('修改商品說明（可留空）',p.description||''); if(newDescription===null)return;
-  const specText=prompt('修改規格：每行「規格名稱|售價|販售單位|扣庫存數」\n例如：單房|350|房|1\n二房|620|組|2\n整箱|1499|箱|5', getVariants(p).map(v=>`${v.name}|${v.price}|${v.unit}|${v.stock_cost}`).join('\n')); if(specText===null)return;
-  const variants=parseVariantText(specText); if(!variants.length)return alert('至少需要一個有效規格');
-  const action=prompt(`商品目前狀態：${p.active===false?'已結單':'開放預約'}\n\n1 = 儲存並開放預約\n2 = 儲存並結單\n3 = 刪除商品`,p.active===false?'2':'1'); if(action===null)return; if(action==='3'){if(confirm(`確定要刪除「${p.name}」嗎？`))await deleteProduct(id);return} if(!['1','2'].includes(action))return alert('請輸入 1、2 或 3');
-  const patch={price:variants[0].price,stock:Math.max(0,Number(newStock)||0),description:newDescription.trim(),variants,active:action==='1'}; if(ONLINE){const {error}=await db.from('products').update(patch).eq('id',id);if(error)return alert('修改商品失敗：'+error.message);await refreshAll()}else{Object.assign(p,patch);save(LS.products,products)} renderAdmin();renderProducts();alert(action==='2'?'商品已結單':'商品修改成功');
+  if (!adminSession) return alert('請先登入後台');
+  const id = el.dataset.edit;
+  const p = products.find(x => String(x.id) === String(id));
+  if (!p) return alert('找不到商品');
+  $('editProductId').value = p.id;
+  $('editName').value = p.name || '';
+  $('editEmoji').value = p.emoji || '';
+  $('editUnit').value = p.unit || '';
+  $('editStock').value = Number(p.stock || 0);
+  $('editDescription').value = p.description || '';
+  $('editActive').value = String(p.active !== false);
+  $('editImage').value = '';
+  $('editImagePreview').innerHTML = p.image_url ? `<img src="${esc(p.image_url)}" alt="${esc(p.name)}">` : `<div class="edit-image-placeholder">${esc(p.emoji || '🍎')}</div>`;
+  $('editVariantRows').innerHTML = '';
+  getVariants(p).forEach(v => addEditVariantRow(v));
+  if (!$('editVariantRows').children.length) addEditVariantRow();
+  if (!$('editProductDialog').open) $('editProductDialog').showModal();
+}
+async function saveEditProduct() {
+  if (!adminSession) return alert('請先登入後台');
+  const id = $('editProductId').value;
+  const p = products.find(x => String(x.id) === String(id));
+  if (!p) return alert('找不到商品');
+  const name = $('editName').value.trim();
+  const unit = $('editUnit').value.trim();
+  const variants = readEditVariantRows();
+  if (!name || !unit || !variants.length) return alert('請填寫商品名稱、基礎庫存單位，並至少保留一個有效規格');
+  try {
+    let image_url = p.image_url || null;
+    const imageFile = $('editImage')?.files?.[0];
+    if (imageFile) image_url = await uploadProductImage(imageFile);
+    const patch = {
+      name,
+      emoji: $('editEmoji').value.trim(),
+      unit,
+      stock: Math.max(0, Number($('editStock').value) || 0),
+      description: $('editDescription').value.trim(),
+      active: $('editActive').value === 'true',
+      variants,
+      price: variants[0].price,
+      image_url
+    };
+    if (ONLINE) {
+      const { error } = await db.from('products').update(patch).eq('id', id);
+      if (error) throw error;
+      await refreshAll();
+    } else {
+      Object.assign(p, patch); save(LS.products, products);
+    }
+    $('editProductDialog').close();
+    renderAdmin(); renderProducts();
+    alert('商品修改成功');
+  } catch (err) {
+    console.error(err); alert('修改商品失敗：' + (err.message || err));
+  }
+}
+async function deleteProductFromEdit() {
+  const id = $('editProductId').value;
+  const p = products.find(x => String(x.id) === String(id));
+  if (!p) return;
+  if (!confirm(`確定要刪除「${p.name}」嗎？`)) return;
+  if (ONLINE) {
+    const r = await db.from('products').delete().eq('id', id);
+    if (r.error) return alert(r.error.message);
+  } else {
+    products = products.filter(x => String(x.id) !== String(id)); save(LS.products, products);
+  }
+  $('editProductDialog').close();
+  await refreshAll(); renderAdmin();
 }
 async function deleteProduct(id) { if (!adminSession) return alert('請先登入後台'); if (!confirm('確定刪除此商品？')) return; if (ONLINE) { const r = await db.from('products').delete().eq('id', id); if (r.error) return alert(r.error.message) } else { products = products.filter(p => String(p.id) !== String(id)); save(LS.products, products) } await refreshAll(); renderAdmin() }
 async function saveSettings() { if (!adminSession) return alert('請先登入後台'); const patch = { location: $('settingLocation').value.trim(), hours: $('settingHours').value.trim(), open: $('settingOpen').value === 'true' }; if (ONLINE) { const r = await db.from('store_settings').upsert({ id: 1, ...patch }); if (r.error) return alert(r.error.message) } else { settings = patch; save(LS.settings, settings) } await refreshAll(); alert('設定已儲存') }

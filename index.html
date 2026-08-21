@@ -7,13 +7,13 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>果來好甜｜水果預約保留</title>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css?v=ui-v2">
+  <link rel="stylesheet" href="styles.css?v=ui-v3">
 </head>
 <body>
 <header class="hero">
   <div class="hero-inner">
-    <div class="logo">果</div>
-    <div><p class="eyebrow">FRUIT COME SWEET</p><h1>今日水果預約保留</h1><p id="todayText" class="muted"></p></div>
+    <div class="logo brand-logo"><img src="brand-logo-icon.png" alt="果來好甜 Logo"></div>
+    <div class="brand-copy"><div class="brand-name">果來好甜</div><p class="eyebrow brand-en">FRUIT COME SWEET</p><h1>今日水果預約保留</h1><p id="todayText" class="muted"></p></div>
   </div>
 </header>
 <main class="container">
@@ -128,11 +128,42 @@
     <section id="settingsPanel" class="panel hidden"><div class="panel-card settings-grid"><label>攤位位置<input id="settingLocation"></label><label>營業時間<input id="settingHours"></label><label>預約狀態<select id="settingOpen"><option value="true">開放預約</option><option value="false">暫停預約</option></select></label><button id="saveSettings" class="primary compact">儲存設定</button></div></section>
   </div>
 </dialog>
+<dialog id="editProductDialog" class="dialog product-edit-dialog">
+  <div class="admin-head">
+    <div><p class="eyebrow">EDIT PRODUCT</p><h2>編輯商品</h2></div>
+    <button id="closeEditProduct" class="icon" type="button">✕</button>
+  </div>
+  <input id="editProductId" type="hidden">
+  <div class="edit-product-layout">
+    <div class="edit-image-panel">
+      <div id="editImagePreview" class="edit-image-preview"></div>
+      <label>更換商品照片<input id="editImage" type="file" accept="image/*"></label>
+      <p class="helper">沒有重新選照片，就會保留目前圖片。</p>
+    </div>
+    <div class="form-grid edit-product-fields">
+      <label>商品名稱<input id="editName"></label>
+      <label>圖示<input id="editEmoji" maxlength="4" placeholder="🥭"></label>
+      <label>基礎庫存單位<input id="editUnit" placeholder="例如：房、顆、斤"></label>
+      <label>基礎庫存<input id="editStock" type="number" min="0"></label>
+      <label class="full-span">商品說明<textarea id="editDescription" rows="3" placeholder="商品特色、規格補充等"></textarea></label>
+      <label>預約狀態<select id="editActive"><option value="true">開放預約</option><option value="false">結單／隱藏</option></select></label>
+    </div>
+  </div>
+  <div class="variant-editor edit-variant-editor">
+    <div class="section-head"><div><strong>販售規格</strong><p class="helper">可直接修改規格、售價、販售單位與扣庫存數。</p></div><button id="editAddVariant" class="secondary compact" type="button">＋ 新增規格</button></div>
+    <div class="variant-head"><span>規格名稱</span><span>價格</span><span>販售單位</span><span>扣庫存</span><span></span></div>
+    <div id="editVariantRows"></div>
+  </div>
+  <div class="edit-product-actions">
+    <button id="deleteProductFromEdit" class="danger" type="button">刪除商品</button>
+    <button id="saveEditProduct" class="primary" type="button">儲存修改</button>
+  </div>
+</dialog>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js?v=staff-v2"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script src="app.js?v=ui-v2"></script>
+<script src="app.js?v=ui-v3"></script>
 <script src="./password-feature.js?v=password-v4"></script>
 </body>
 </html>

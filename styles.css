@@ -86,3 +86,26 @@
 
 /* Lalamove 配送提醒 */
 .lala-info,.lala-success-note{margin:14px 0;padding:16px;background:#fff7ef;border:1px solid var(--line);border-radius:14px;line-height:1.7}.lala-info p,.lala-success-note p{margin:8px 0}.lala-list{display:grid;gap:5px}.lala-success-note b,.lala-info b{font-weight:900;color:var(--orange-dark)}
+
+/* 品牌頁首 */
+.brand-logo{
+  width:58px;height:58px;border-radius:18px;background:#fff;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;padding:4px;box-shadow:var(--shadow);flex:0 0 auto;
+}
+.brand-logo img{width:100%;height:100%;object-fit:contain;display:block;border-radius:14px}
+.brand-copy{min-width:0}.brand-name{font-size:20px;font-weight:950;line-height:1.05;margin-bottom:2px;letter-spacing:.02em}.brand-en{font-size:9px;letter-spacing:.16em;margin-bottom:5px}.brand-copy h1{margin-bottom:6px}
+
+/* 訂單成功頁：取貨號碼與 QR 同屏清楚呈現 */
+.success-head{text-align:center}.success-fruit{font-size:46px;line-height:1}.success-head h2{font-size:30px;margin:8px 0 10px}.success-head>p{margin:10px 0 6px}
+.daily-number-card{margin:10px auto 12px;padding:13px 16px;background:#fff7ed;border:1px solid #f1dfcb;border-radius:16px;display:flex;align-items:baseline;justify-content:center;gap:8px;max-width:310px}.daily-number-card span{font-size:15px;font-weight:800}.daily-number-card strong{font-size:38px;line-height:1;font-weight:950}.daily-number-card small{font-size:15px;color:var(--muted)}
+.success-items{margin-top:8px}
+
+/* 後台訂單，備貨視角 */
+#orderList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.admin-order-card{margin:0;padding:16px;background:#fff}.admin-order-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--line)}.admin-order-number{display:grid;gap:2px}.admin-order-number span{font-size:12px;color:var(--muted);font-weight:800}.admin-order-number strong{font-size:25px;line-height:1.1}.admin-order-customer{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin:12px 0}.admin-order-customer>strong{font-size:18px}.admin-order-customer>span{color:var(--muted);font-size:13px;align-self:center}.admin-order-id{grid-column:1/-1}.admin-order-meta{display:flex;flex-wrap:wrap;gap:8px 14px;padding:10px 12px;background:var(--cream);border-radius:12px;font-weight:800;font-size:13px}.admin-order-items{margin:12px 0;border-top:1px solid var(--line)}.admin-order-item-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}.admin-order-item-main{display:flex;gap:8px;min-width:0}.admin-order-item-main div{min-width:0}.admin-order-item-main strong{display:block;line-height:1.35}.admin-order-item-main small{display:block;color:var(--orange-dark);font-weight:800;margin-top:3px}.admin-order-emoji{font-size:22px}.admin-order-item-qty{font-weight:950;font-size:16px}.admin-order-item-price{font-size:12px;color:var(--muted);text-align:right}.admin-order-note{display:grid;grid-template-columns:auto 1fr;gap:8px;padding:10px 12px;border-radius:12px;background:#fff7ef;margin:10px 0}.admin-order-note strong{color:var(--orange-dark)}.admin-order-total{display:flex;justify-content:space-between;align-items:center;padding:10px 0;font-weight:800}.admin-order-total strong{font-size:21px}.order-actions{padding-top:8px;border-top:1px solid var(--line)}.order-actions button.is-current{background:var(--orange);color:#fff;border-color:var(--orange)}
+
+/* 商品完整編輯視窗 */
+.product-edit-dialog{width:min(94vw,820px);max-height:92vh;overflow:auto}.edit-product-layout{display:grid;grid-template-columns:230px minmax(0,1fr);gap:18px;margin-top:12px}.edit-image-panel{display:grid;gap:10px;align-content:start}.edit-image-preview{width:100%;aspect-ratio:1/1;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--cream);display:flex;align-items:center;justify-content:center}.edit-image-preview img{width:100%;height:100%;object-fit:cover}.edit-image-placeholder{font-size:64px}.edit-product-fields{grid-template-columns:1fr 1fr}.edit-product-fields .full-span{grid-column:1/-1}.edit-variant-editor{margin-top:18px}.edit-product-actions{display:grid;grid-template-columns:auto 1fr;gap:10px;margin-top:16px}.edit-product-actions .primary{width:100%}
+
+@media(max-width:760px){
+  #orderList{grid-template-columns:1fr}.admin-order-card{padding:14px}.admin-order-number strong{font-size:28px}.admin-order-item-row{grid-template-columns:minmax(0,1fr) auto}.admin-order-item-price{grid-column:1/-1;text-align:left;padding-left:30px}.edit-product-layout{grid-template-columns:1fr}.edit-image-panel{grid-template-columns:120px 1fr;align-items:center}.edit-image-preview{width:120px}.edit-product-fields{grid-template-columns:1fr}.edit-product-fields .full-span{grid-column:auto}.edit-product-actions{grid-template-columns:1fr}.product-edit-dialog{padding:18px}}
+@media(max-width:430px){.brand-logo{width:50px;height:50px;border-radius:16px}.brand-name{font-size:18px}.brand-en{font-size:8px}.success-head h2{font-size:26px}.daily-number-card strong{font-size:34px}.edit-image-panel{grid-template-columns:100px 1fr}.edit-image-preview{width:100px}}
