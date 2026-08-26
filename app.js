@@ -137,7 +137,19 @@ async function lookupMyOrders() {
     ${order.daily_number ? `<div style="margin-top:6px;font-weight:800;font-size:18px;">今日取貨號碼：${order.daily_number} 號</div>` : ''}
     <div>取貨碼：<strong>${order.pickup_code || ''}</strong></div>
     <div>${order.pickup_time || ''}｜${order.method || ''}</div>
-    <div>金額：$${Number(order.total || 0).toLocaleString()}</div>
+
+    <div class="lookup-items">
+      <div class="lookup-items-title">訂購明細</div>
+      ${(order.items || []).length
+        ? (order.items || []).map(i => `
+          <div class="lookup-item-row">
+            <div class="lookup-item-name">${esc(i.emoji || '')} <strong>${esc(i.name || '')}</strong>${i.variant_name ? `<span>｜${esc(i.variant_name)}</span>` : ''}</div>
+            <div class="lookup-item-detail">${esc(i.unit || '')} × ${Number(i.qty || 0)} ・ ${money(Number(i.price || 0))} / ${esc(i.unit || '')}</div>
+            <strong class="lookup-item-subtotal">${money(Number(i.price || 0) * Number(i.qty || 0))}</strong>
+          </div>`).join('')
+        : '<div class="helper">此筆訂單暫無商品明細</div>'}
+    </div>
+    <div class="lookup-total"><span>商品小計</span><strong>$${Number(order.total || 0).toLocaleString()}</strong></div>
 
     <div
       id="lookupQr-${index}"

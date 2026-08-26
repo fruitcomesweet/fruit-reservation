@@ -109,3 +109,15 @@
 @media(max-width:760px){
   #orderList{grid-template-columns:1fr}.admin-order-card{padding:14px}.admin-order-number strong{font-size:28px}.admin-order-item-row{grid-template-columns:minmax(0,1fr) auto}.admin-order-item-price{grid-column:1/-1;text-align:left;padding-left:30px}.edit-product-layout{grid-template-columns:1fr}.edit-image-panel{grid-template-columns:120px 1fr;align-items:center}.edit-image-preview{width:120px}.edit-product-fields{grid-template-columns:1fr}.edit-product-fields .full-span{grid-column:auto}.edit-product-actions{grid-template-columns:1fr}.product-edit-dialog{padding:18px}}
 @media(max-width:430px){.brand-logo{width:50px;height:50px;border-radius:16px}.brand-name{font-size:18px}.brand-en{font-size:8px}.success-head h2{font-size:26px}.daily-number-card strong{font-size:34px}.edit-image-panel{grid-template-columns:100px 1fr}.edit-image-preview{width:100px}}
+
+
+/* 查詢訂單：商品明細 */
+.lookup-items{margin-top:16px!important;padding-top:14px;border-top:1px solid var(--line)}
+.lookup-items-title{font-weight:900;font-size:16px;margin-bottom:8px}
+.lookup-item-row{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:10px 0;border-bottom:1px dashed #eadfd8}
+.lookup-item-name{line-height:1.5}
+.lookup-item-name span{color:var(--muted);font-weight:700}
+.lookup-item-detail{font-size:13px;color:var(--muted);line-height:1.5}
+.lookup-item-subtotal{grid-column:2;grid-row:1 / span 2;align-self:center;white-space:nowrap}
+.lookup-total{display:flex;justify-content:space-between;gap:12px;padding:14px 0 2px;font-size:17px;font-weight:900}
+@media(max-width:480px){.lookup-item-row{grid-template-columns:1fr auto}.lookup-item-detail{font-size:12px}}
