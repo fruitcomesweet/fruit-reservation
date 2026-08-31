@@ -121,3 +121,11 @@
 .lookup-item-subtotal{grid-column:2;grid-row:1 / span 2;align-self:center;white-space:nowrap}
 .lookup-total{display:flex;justify-content:space-between;gap:12px;padding:14px 0 2px;font-size:17px;font-weight:900}
 @media(max-width:480px){.lookup-item-row{grid-template-columns:1fr auto}.lookup-item-detail{font-size:12px}}
+
+/* 暫停預約公告 */
+.closed-notice{padding:34px 20px;margin:6px 0 10px;background:linear-gradient(145deg,#fffaf2,#fff3e3);border:1px solid var(--line);border-radius:22px;text-align:center;box-shadow:var(--shadow)}
+.closed-fruit{font-size:52px;line-height:1;margin-bottom:10px}.closed-notice h2{font-size:28px;margin:0 0 10px}.closed-notice p{margin:7px 0;color:var(--muted);line-height:1.7}.closed-notice .closed-lead{font-size:17px;font-weight:850;color:var(--ink)}.closed-notice small{display:block;margin-top:16px;color:var(--orange-dark);font-weight:800}
+
+/* 查詢訂單：加訂與取消 */
+.lookup-reorder-tip{margin:10px 0 0;padding:10px 12px;background:#fff7ef;border-radius:12px;color:var(--orange-dark);font-size:13px;line-height:1.6;font-weight:750}
+.lookup-cancel-btn{width:100%;margin-top:14px}.pickup-cancelled{text-align:center;font-weight:850;color:var(--muted);padding:13px;background:#f4f1ed;border-radius:12px}

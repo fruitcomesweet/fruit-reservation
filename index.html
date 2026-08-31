@@ -22,6 +22,7 @@
     <div class="order-lookup-box">
       <h3>查詢我的訂單</h3>
       <p class="helper">已經下單了嗎？輸入手機號碼即可快速查看今天的訂單與 QR Code。</p>
+      <p class="lookup-reorder-tip">想再加訂水果嗎？直接重新下單即可，每次加訂會產生新的 QR Code，取貨時請將所有 QR Code 一併出示。</p>
       <div class="order-lookup-row">
         <input id="lookupPhone" inputmode="numeric" maxlength="10" placeholder="09xxxxxxxx">
         <button id="lookupMyOrders" class="secondary" type="button">查詢今日訂單</button>
@@ -30,12 +31,20 @@
       <div id="lookupResults"></div>
     </div>
   </section>
-  <section>
+  <section id="salesSection">
     <div class="section-head"><div><p class="eyebrow">TODAY'S FRUIT</p><h2>今天想留哪一份甜？</h2></div><span id="openStatus" class="tiny"></span></div>
+    <div id="closedNotice" class="closed-notice hidden">
+      <div class="closed-fruit">🍊</div>
+      <h2>今天的水果先收攤啦</h2>
+      <p class="closed-lead">謝謝大家今天把水果帶回家！</p>
+      <p>預訂系統將於隔日 11:30 前重新開啟</p>
+      <p>已經下單的果粉，仍可以在上方查詢訂單與 QR Code</p>
+      <small>明天再來看看有什麼新鮮水果吧 🍇</small>
+    </div>
     <div id="productGrid" class="product-grid"></div>
     <div id="emptyProducts" class="empty hidden">今天的商品還在準備中 🍊</div>
   </section>
-  <section class="card order-card">
+  <section id="reservationSection" class="card order-card">
     <div class="section-head"><div><p class="eyebrow">RESERVATION</p><h2>填寫預約資料</h2></div><span id="cartCount" class="badge muted-badge">尚未選商品</span></div>
     <div id="cartSummary" class="cart empty-cart">請先選擇上方商品。</div>
     <form id="reservationForm" novalidate>
@@ -58,7 +67,8 @@
         </div>
         <p class="helper">配送會先進入「等待報價」，確認運費後才正式保留庫存。</p>
       </div>
-      <label>備註<textarea id="note" maxlength="120" rows="3" placeholder="例如：幫我挑熟一點、18:30後到"></textarea></label>
+      <label>備註<textarea id="note" maxlength="120" rows="3" placeholder="例如：幫我挑熟一點、18:30後到；
+若想預訂現場其他品項，也可備註預訂，實際保留依現場庫存為主，售完則無法幫忙保留。"></textarea></label>
       <label class="consent"><input id="agree" type="checkbox" required><span>我確認會在今日營業時間內取貨，若臨時無法前往會主動告知。</span></label>
       <button class="primary" type="submit">送出預約保留</button><p id="formMessage" class="form-message"></p>
     </form>

@@ -32,14 +32,31 @@ async function refreshAdminOrders() {
   orders = (o.data || []).map(x => ({ ...x, items: x.order_items || [] }));
 }
 function loadLocal() { products = load(LS.products, defaults.products); orders = load(LS.orders, []); settings = load(LS.settings, defaults.settings) }
-function applySettings() { $('storeLocation').textContent = settings.location; $('storeHours').textContent = settings.hours; $('openStatus').textContent = settings.open ? '預約開放中' : '目前暫停預約'; $('settingLocation').value = settings.location; $('settingHours').value = settings.hours; $('settingOpen').value = String(settings.open) }
+function applySettings() {
+  $('storeLocation').textContent = settings.location;
+  $('storeHours').textContent = settings.hours;
+  $('openStatus').textContent = settings.open ? '預約開放中' : '目前暫停預約';
+  $('settingLocation').value = settings.location;
+  $('settingHours').value = settings.hours;
+  $('settingOpen').value = String(settings.open);
+  const closed = !settings.open;
+  if ($('closedNotice')) $('closedNotice').classList.toggle('hidden', !closed);
+  if ($('productGrid')) $('productGrid').classList.toggle('hidden', closed);
+  if ($('emptyProducts')) $('emptyProducts').classList.toggle('hidden', closed || products.filter(p => p.active).length > 0);
+  if ($('reservationSection')) $('reservationSection').classList.toggle('hidden', closed);
+}
 function getVariants(p) {
   const raw = Array.isArray(p.variants) ? p.variants : [];
   return raw.length ? raw.map((v, idx) => ({ id: String(v.id || `v${idx+1}`), name: String(v.name || p.unit || '規格'), unit: String(v.unit || v.name || p.unit || '份'), price: Number(v.price ?? p.price ?? 0), stock_cost: Math.max(1, Number(v.stock_cost || 1)) })) : [{ id: 'default', name: p.unit || '單份', unit: p.unit || '份', price: Number(p.price || 0), stock_cost: 1 }];
 }
 function cartKey(productId, variantId) { return `${productId}::${variantId}`; }
 function renderProducts() {
-  const visible = products.filter(p => p.active); $('emptyProducts').classList.toggle('hidden', visible.length); $('productGrid').innerHTML = visible.map(p => {
+  const visible = products.filter(p => p.active);
+  const closed = !settings.open;
+  $('emptyProducts').classList.toggle('hidden', closed || visible.length > 0);
+  $('productGrid').classList.toggle('hidden', closed);
+  if (closed) { $('productGrid').innerHTML = ''; return; }
+  $('productGrid').innerHTML = visible.map(p => {
     const variants = getVariants(p);
     const rememberedId = selectedVariantByProduct[String(p.id)];
     const selected = variants.find(v => v.id === rememberedId) || variants[0];
@@ -164,10 +181,17 @@ async function lookupMyOrders() {
           ? `<br>${new Date(order.picked_up_at).toLocaleString('zh-TW')}`
           : ''}
            </div>`
-        : `<p class="helper">取貨時請出示此 QR Code 給店員掃描。</p>`
+        : order.status === '已取消'
+          ? `<div class="pickup-cancelled">此訂單已取消</div>`
+          : `<p class="helper">取貨時請出示此 QR Code 給店員掃描。</p>`
       }
+    ${['未取','已確認','等待報價'].includes(order.status) ? `<button class="lookup-cancel-btn danger" type="button" data-cancel-order="${esc(order.id || '')}" data-cancel-code="${esc(order.pickup_code || '')}">取消此訂單</button>` : ''}
   </div>
 `).join('');
+
+    document.querySelectorAll('.lookup-cancel-btn').forEach(btn => {
+      btn.onclick = () => cancelCustomerOrder(btn.dataset.cancelOrder, phone, btn.dataset.cancelCode);
+    });
 
     enrichedData.forEach((order, index) => {
       const qrTarget = document.getElementById(`lookupQr-${index}`);
@@ -187,6 +211,39 @@ async function lookupMyOrders() {
     message.textContent = '查詢失敗，請稍後再試';
   }
 }
+async function cancelCustomerOrder(orderId, phone, pickupCode) {
+  if (!orderId || !phone || !pickupCode) return;
+  const ok = confirm(`確定要取消訂單 ${orderId} 嗎？\n取消後，已保留的商品庫存會自動釋回販售頁。`);
+  if (!ok) return;
+  try {
+    if (ONLINE) {
+      const { error } = await db.rpc('cancel_customer_order', {
+        p_order_id: orderId,
+        p_phone: phone,
+        p_pickup_code: pickupCode
+      });
+      if (error) throw error;
+    } else {
+      const order = orders.find(o => o.id === orderId && o.phone === phone);
+      if (!order || ['已取','已取消'].includes(order.status)) throw new Error('此訂單目前無法取消');
+      if (order.method === '現場自取' || ['已確認','未取'].includes(order.status)) {
+        (order.items || []).forEach(i => {
+          const p = products.find(x => String(x.id) === String(i.product_id));
+          if (p) p.stock += Number(i.qty || 0) * Math.max(1, Number(i.stock_cost || 1));
+        });
+      }
+      order.status = '已取消';
+      save(LS.orders, orders); save(LS.products, products);
+    }
+    alert('訂單已取消，已保留的庫存也已釋回。');
+    await refreshAll();
+    await lookupMyOrders();
+  } catch (err) {
+    console.error(err);
+    alert(err?.message || '取消失敗，請稍後再試。');
+  }
+}
+
 function showSuccess(o) {
   const pickupCode = o.pickup_code || o.id;
   const dailyNumber = o.daily_number;
