@@ -1,5 +1,5 @@
-const CACHE_NAME = 'fruit-staff-v2';
-const ASSETS = ['./','./index.html','./styles.css?v=staff-v2','./app.js?v=staff-v2','./config.js?v=staff-v2'];
+const CACHE_NAME = 'fruit-staff-v3';
+const ASSETS = ['./','./index.html','./styles.css?v=staff-v3','./app.js?v=staff-v3','./config.js?v=staff-v3'];
 self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)));

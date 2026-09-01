@@ -3,7 +3,7 @@ const ONLINE = Boolean(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY && window.supab
 const db = ONLINE ? window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY) : null;
 const LS = { products: 'fruitFormal_products', orders: 'fruitFormal_orders', settings: 'fruitFormal_settings' };
 const defaults = { products: [{ id: 'mango', name: '金煌芒果', unit: '斤', price: 33, stock: 60, emoji: '🥭', description: '特A級，保留需最少3斤', active: true, sort_order: 1 }, { id: 'durian', name: '赤皇榴槤', unit: '顆', price: 499, stock: 20, emoji: '🌰', description: '明星牌特A果，單顆販售', active: true, sort_order: 2 }, { id: 'dragon', name: '白肉火龍果', unit: '斤', price: 39, stock: 90, emoji: '🐉', description: '清甜爽口，限量供應', active: true, sort_order: 3 }], settings: { location: '📍 板橋重慶黃昏市場', hours: '取貨時間 14:00–19:30｜商品限當日取貨', open: true } };
-let products = [], orders = [], settings = {}, cart = {}, adminSession = null, currentStaff = null, staffMembers = [], qrScanner = null, currentPickupOrder = null;
+let products = [], orders = [], settings = {}, cart = {}, adminSession = null, currentStaff = null, staffMembers = [], qrScanner = null, currentPickupOrder = null, productStatusFilter = 'all';
 const selectedVariantByProduct = {}; // 記住每個商品目前選擇的規格，重新渲染時不跳回第一個
 const $ = id => document.getElementById(id), money = n => `$${Number(n).toLocaleString('zh-TW')}`, clone = x => JSON.parse(JSON.stringify(x));
 const load = (k, f) => { try { return JSON.parse(localStorage.getItem(k)) ?? clone(f) } catch { return clone(f) } };
@@ -63,7 +63,7 @@ function renderProducts() {
     selectedVariantByProduct[String(p.id)] = selected.id;
     const sold = p.stock < Math.min(...variants.map(v => v.stock_cost));
     const options = variants.map(v => `<option value="${esc(v.id)}" ${v.id === selected.id ? 'selected' : ''}>${esc(v.name)}｜${money(v.price)} / ${esc(v.unit)}</option>`).join('');
-    return `<article class="product ${sold ? 'sold' : ''}" data-product-card="${p.id}"><div class="product-icon">${p.image_url ? `<img src="${esc(p.image_url)}" alt="${esc(p.name)}" class="product-image">` : esc(p.emoji || '🍎')}</div><h3>${esc(p.name)}</h3>${p.description ? `<p class="product-desc">${esc(p.description)}</p>` : ''}<label class="variant-label">選擇規格<select data-variant-select="${p.id}">${options}</select></label><div class="meta"><span class="price" data-variant-price="${p.id}">${money(selected.price)} / ${esc(selected.unit)}</span><span class="stock">基礎庫存剩 ${p.stock} ${esc(p.unit)}</span></div><div class="qty"><button data-dec-product="${p.id}" ${sold ? 'disabled' : ''}>−</button><strong data-product-qty="${p.id}">0</strong><button data-inc-product="${p.id}" ${sold ? 'disabled' : ''}>＋</button></div></article>`;
+    return `<article class="product ${sold ? 'sold' : ''}" data-product-card="${p.id}"><div class="product-icon">${p.image_url ? `<img src="${esc(p.image_url)}" alt="${esc(p.name)}" class="product-image" loading="lazy" decoding="async">` : esc(p.emoji || '🍎')}</div><h3>${esc(p.name)}</h3>${p.description ? `<p class="product-desc">${esc(p.description)}</p>` : ''}<label class="variant-label">選擇規格<select data-variant-select="${p.id}">${options}</select></label><div class="meta"><span class="price" data-variant-price="${p.id}">${money(selected.price)} / ${esc(selected.unit)}</span><span class="stock">基礎庫存剩 ${p.stock} ${esc(p.unit)}</span></div><div class="qty"><button data-dec-product="${p.id}" ${sold ? 'disabled' : ''}>−</button><strong data-product-qty="${p.id}">0</strong><button data-inc-product="${p.id}" ${sold ? 'disabled' : ''}>＋</button></div></article>`;
   }).join('');
   document.querySelectorAll('[data-variant-select]').forEach(s => s.onchange = () => {
     selectedVariantByProduct[String(s.dataset.variantSelect)] = s.value;
@@ -99,7 +99,7 @@ async function openAdminDialog() {
 function bind() {
   const lookupBtn = $('lookupMyOrders');
   if (lookupBtn) lookupBtn.onclick = lookupMyOrders;
-  document.querySelectorAll('input[name="method"]').forEach(r => r.onchange = () => { $('deliveryFields').classList.toggle('hidden', !(r.checked && r.value === 'Lalamove配送')) }); $('reservationForm').onsubmit = submitOrder; const adminBtn = $('openAdmin'); if (adminBtn) adminBtn.onclick = openAdminDialog; if (location.hash === '#admin') openAdminDialog(); window.addEventListener('hashchange', () => { if (location.hash === '#admin') openAdminDialog(); }); $('closeAdmin').onclick = () => $('adminDialog').close(); $('closeSuccess').onclick = () => $('successDialog').close(); $('unlockAdmin').onclick = unlock; $('logoutAdmin').onclick = logout; document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab)); $('statusFilter').onchange = renderOrders; $('orderSearch').oninput = renderOrders; $('exportOrders').onclick = exportCSV; $('addProduct').onclick = addProduct; $('addVariant').onclick = () => addVariantRow(); $('saveSettings').onclick = saveSettings; $('saveStaff').onclick = saveStaff; $('startQrScanner').onclick = startQrScanner; $('stopQrScanner').onclick = stopQrScanner; $('lookupPickupCode').onclick = () => lookupPickupCode($('manualPickupCode').value); $('manualPickupCode').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); lookupPickupCode(e.currentTarget.value) } }; $('closeEditProduct').onclick = () => $('editProductDialog').close(); $('editAddVariant').onclick = () => addEditVariantRow(); $('saveEditProduct').onclick = saveEditProduct; $('deleteProductFromEdit').onclick = deleteProductFromEdit; $('editImage').onchange = e => { const file = e.currentTarget.files?.[0]; if (!file) return; const url = URL.createObjectURL(file); $('editImagePreview').innerHTML = `<img src="${url}" alt="新商品照片預覽">`; }
+  document.querySelectorAll('input[name="method"]').forEach(r => r.onchange = () => { $('deliveryFields').classList.toggle('hidden', !(r.checked && r.value === 'Lalamove配送')) }); $('reservationForm').onsubmit = submitOrder; const adminBtn = $('openAdmin'); if (adminBtn) adminBtn.onclick = openAdminDialog; if (location.hash === '#admin') openAdminDialog(); window.addEventListener('hashchange', () => { if (location.hash === '#admin') openAdminDialog(); }); $('closeAdmin').onclick = () => $('adminDialog').close(); $('closeSuccess').onclick = () => $('successDialog').close(); $('unlockAdmin').onclick = unlock; $('logoutAdmin').onclick = logout; document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab)); $('statusFilter').onchange = renderOrders; $('orderSearch').oninput = renderOrders; $('exportOrders').onclick = exportCSV; $('addProduct').onclick = addProduct; $('addVariant').onclick = () => addVariantRow(); if ($('productStatusFilter')) $('productStatusFilter').onchange = e => { productStatusFilter = e.currentTarget.value; renderProductAdmin(); }; $('saveSettings').onclick = saveSettings; $('saveStaff').onclick = saveStaff; $('startQrScanner').onclick = startQrScanner; $('stopQrScanner').onclick = stopQrScanner; $('lookupPickupCode').onclick = () => lookupPickupCode($('manualPickupCode').value); $('manualPickupCode').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); lookupPickupCode(e.currentTarget.value) } }; $('closeEditProduct').onclick = () => $('editProductDialog').close(); $('editAddVariant').onclick = () => addEditVariantRow(); $('saveEditProduct').onclick = saveEditProduct; $('deleteProductFromEdit').onclick = deleteProductFromEdit; $('editImage').onchange = e => { const file = e.currentTarget.files?.[0]; if (!file) return; const url = URL.createObjectURL(file); $('editImagePreview').innerHTML = `<img src="${url}" alt="新商品照片預覽">`; }
 }
 async function submitOrder(e) {
   e.preventDefault(); $('formMessage').textContent = ''; if (!settings.open) return fail('目前暫停預約。'); const entries = Object.values(cart); if (!entries.length) return fail('請先選擇至少一項商品。'); const name = $('name').value.trim(), phone = $('phone').value.trim(), pickup = $('pickupTime').value, method = document.querySelector('input[name="method"]:checked').value, address = ''; if (!name || !/^09\d{8}$/.test(phone) || !pickup || !$('agree').checked) return fail('請確認姓名、10碼手機、取貨時間與同意事項。'); const items = entries.map(x => { const p = products.find(y => String(y.id) === String(x.product_id)); return { product_id:p.id, name:p.name, unit:x.unit, price:x.price, qty:x.qty, emoji:p.emoji, variant_id:x.variant_id, variant_name:x.variant_name, stock_cost:x.stock_cost } }); const costs={}; for (const i of items) costs[i.product_id]=(costs[i.product_id]||0)+i.qty*i.stock_cost; for (const [pid,cost] of Object.entries(costs)) { const p=products.find(x=>String(x.id)===String(pid)); if(!p||cost>p.stock) return fail(`${p?.name||'商品'} 庫存不足。`) } const total = items.reduce((s, i) => s + i.price * i.qty, 0), status = method === 'Lalamove配送' ? '等待報價' : '未取'; let order;
@@ -143,7 +143,12 @@ async function lookupMyOrders() {
           p_order_id: order.id
         });
         if (dailyNumberError) console.error(dailyNumberError);
-        return { ...order, daily_number: dailyNumberError ? null : dailyNumber };
+        let note = order.note || '';
+        if (!note) {
+          const { data: noteData, error: noteError } = await db.rpc('lookup_order_note', { p_order_id: order.id, p_phone: phone });
+          if (!noteError) note = noteData || '';
+        }
+        return { ...order, note, daily_number: dailyNumberError ? null : dailyNumber };
       })
     );
 
@@ -154,6 +159,7 @@ async function lookupMyOrders() {
     ${order.daily_number ? `<div style="margin-top:6px;font-weight:800;font-size:18px;">今日取貨號碼：${order.daily_number} 號</div>` : ''}
     <div>取貨碼：<strong>${order.pickup_code || ''}</strong></div>
     <div>${order.pickup_time || ''}｜${order.method || ''}</div>
+    ${order.note ? `<div class="lookup-note"><strong>訂單備註</strong><span>${esc(order.note)}</span></div>` : ''}
 
     <div class="lookup-items">
       <div class="lookup-items-title">訂購明細</div>
@@ -435,39 +441,34 @@ function renderOrders() {
   renderStats();
 }
 async function updateOrder(id, status) { if (!adminSession) return alert('請先登入後台'); if (ONLINE) { const r = await db.rpc('update_order_status', { p_order_id: id, p_new_status: status }); if (r.error) return alert(r.error.message) } else { const o = orders.find(x => x.id === id); o.status = status; save(LS.orders, orders) } await refreshAll(); renderAdmin() }
+async function compressProductImage(file) {
+  if (!file || !file.type?.startsWith('image/')) return file;
+  const bitmap = await createImageBitmap(file);
+  const maxSide = 1400;
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const width = Math.max(1, Math.round(bitmap.width * scale));
+  const height = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close?.();
+  const blob = await new Promise((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('圖片壓縮失敗')), 'image/jpeg', 0.78));
+  return blob.size < file.size ? blob : file;
+}
 async function uploadProductImage(file) {
   if (!file) return null;
-
-  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-
-  // 先把手機選到的照片轉成真正的二進位內容
-  const arrayBuffer = await file.arrayBuffer();
-
-  if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-    throw new Error('讀不到照片內容，請重新選擇照片');
-  }
-
-  const { error: uploadError } = await db.storage
-    .from('product-images')
-    .upload(fileName, arrayBuffer, {
-      cacheControl: '3600',
-      upsert: false,
-      contentType: file.type || 'image/jpeg'
-    });
-
-  if (uploadError) {
-    console.error(uploadError);
-    throw new Error(
-      '商品照片上傳失敗：' +
-      (uploadError.message || JSON.stringify(uploadError))
-    );
-  }
-
-  const { data } = db.storage
-    .from('product-images')
-    .getPublicUrl(fileName);
-
+  const optimized = await compressProductImage(file);
+  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+  const arrayBuffer = await optimized.arrayBuffer();
+  if (!arrayBuffer || arrayBuffer.byteLength === 0) throw new Error('讀不到照片內容，請重新選擇照片');
+  const { error: uploadError } = await db.storage.from('product-images').upload(fileName, arrayBuffer, {
+    cacheControl: '2592000',
+    upsert: false,
+    contentType: optimized.type || 'image/jpeg'
+  });
+  if (uploadError) throw new Error('商品照片上傳失敗：' + (uploadError.message || JSON.stringify(uploadError)));
+  const { data } = db.storage.from('product-images').getPublicUrl(fileName);
   return data.publicUrl;
 }
 function parseVariantText(text='') { return String(text).split(/\n+/).map((line,idx)=>{const [name,price,unit,cost]=line.split('|').map(x=>x.trim());return {id:`v${idx+1}`,name,price:Number(price),unit:unit||name,stock_cost:Math.max(1,Number(cost)||1)}}).filter(v=>v.name&&v.price>=0); }
@@ -503,7 +504,9 @@ async function addProduct() {
       variants,
       emoji,
       description,
-      image_url
+      image_url,
+      active: true,
+      reservation_status: 'open'
     };
 
     if (ONLINE) {
@@ -524,7 +527,19 @@ async function addProduct() {
     console.error(err);
     alert('新增商品失敗：' + (err.message || err));
   }
-} function renderProductAdmin() { $('productAdminList').innerHTML = products.map(p => { const vs=getVariants(p); return `<article class="admin-product"><div class="admin-product-top"><div><strong>${esc(p.emoji)} ${esc(p.name)}</strong><div class="order-id">基礎庫存：${p.stock} ${esc(p.unit)}</div><div class="variant-admin-summary">${vs.map(v=>`${esc(v.name)} ${money(v.price)} / ${esc(v.unit)}｜扣 ${v.stock_cost} ${esc(p.unit)}`).join('<br>')}</div></div><button class="secondary" data-edit="${p.id}">編輯商品</button></div></article>` }).join(''); }
+} function productAdminStatus(p) {
+  const raw = p.reservation_status || (p.active === false ? 'hidden' : 'open');
+  if (raw === 'paused') return { key:'paused', label:'暫停預約', icon:'⏸', cls:'paused' };
+  if (raw === 'hidden' || p.active === false) return { key:'hidden', label:'結單／隱藏', icon:'●', cls:'hidden-status' };
+  return { key:'open', label:'開放預約', icon:'●', cls:'open' };
+}
+function renderProductAdmin() {
+  const list = products.filter(p => productStatusFilter === 'all' || productAdminStatus(p).key === productStatusFilter);
+  $('productAdminList').innerHTML = list.length ? list.map(p => {
+    const vs = getVariants(p), st = productAdminStatus(p);
+    return `<article class="admin-product admin-product-${st.cls}"><div class="admin-product-top"><div class="admin-product-main"><div class="admin-product-title-row"><strong>${esc(p.emoji)} ${esc(p.name)}</strong><span class="product-status-chip ${st.cls}">${st.icon} ${st.label}</span></div><div class="order-id">基礎庫存：${p.stock} ${esc(p.unit)}</div><div class="variant-admin-summary">${vs.map(v=>`${esc(v.name)} ${money(v.price)} / ${esc(v.unit)}｜扣 ${v.stock_cost} ${esc(p.unit)}`).join('<br>')}</div></div><button class="secondary" data-edit="${p.id}">編輯商品</button></div></article>`;
+  }).join('') : '<div class="empty">這個狀態目前沒有商品。</div>';
+}
 document.addEventListener('click', e => {
   const btn = e.target.closest('[data-edit]');
   if (!btn) return;
@@ -558,7 +573,7 @@ async function editProduct(el) {
   $('editUnit').value = p.unit || '';
   $('editStock').value = Number(p.stock || 0);
   $('editDescription').value = p.description || '';
-  $('editActive').value = String(p.active !== false);
+  $('editActive').value = p.reservation_status || (p.active === false ? 'hidden' : 'open');
   $('editImage').value = '';
   $('editImagePreview').innerHTML = p.image_url ? `<img src="${esc(p.image_url)}" alt="${esc(p.name)}">` : `<div class="edit-image-placeholder">${esc(p.emoji || '🍎')}</div>`;
   $('editVariantRows').innerHTML = '';
@@ -585,7 +600,8 @@ async function saveEditProduct() {
       unit,
       stock: Math.max(0, Number($('editStock').value) || 0),
       description: $('editDescription').value.trim(),
-      active: $('editActive').value === 'true',
+      active: $('editActive').value === 'open',
+      reservation_status: $('editActive').value,
       variants,
       price: variants[0].price,
       image_url

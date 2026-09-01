@@ -129,3 +129,9 @@
 /* 查詢訂單：加訂與取消 */
 .lookup-reorder-tip{margin:10px 0 0;padding:10px 12px;background:#fff7ef;border-radius:12px;color:var(--orange-dark);font-size:13px;line-height:1.6;font-weight:750}
 .lookup-cancel-btn{width:100%;margin-top:14px}.pickup-cancelled{text-align:center;font-weight:850;color:var(--muted);padding:13px;background:#f4f1ed;border-radius:12px}
+
+/* 2026-09 商品管理狀態與訂單備註 */
+.lookup-note{display:grid;gap:4px;margin:12px 0;padding:11px 12px;border-radius:12px;background:#fff7ef;border:1px solid #f2dcc8;white-space:pre-wrap}.lookup-note strong{color:var(--orange-dark)}
+.product-status-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:14px 0 10px;padding:12px 14px;background:var(--cream);border:1px solid var(--line);border-radius:14px}.product-status-toolbar select{width:auto;min-width:180px}
+.admin-product-title-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:4px}.admin-product-title-row>strong{font-size:17px}.product-status-chip{display:inline-flex;align-items:center;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:900;white-space:nowrap}.product-status-chip.open{background:#e9f6ed;color:#2f7047}.product-status-chip.paused{background:#fff3cf;color:#8a6514}.product-status-chip.hidden-status{background:#eeeae6;color:#665e58}.admin-product-open{border-left:5px solid #79b88c}.admin-product-paused{border-left:5px solid #e6bd55;background:#fffdf7}.admin-product-hidden-status{border-left:5px solid #aaa29c;opacity:.78}.admin-product-main{min-width:0}
+@media(max-width:680px){.product-status-toolbar{align-items:stretch;flex-direction:column}.product-status-toolbar select{width:100%}.admin-product-top{align-items:flex-start}.admin-product-top>button{flex:0 0 104px}.admin-product-title-row{align-items:flex-start}}

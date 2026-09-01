@@ -120,7 +120,7 @@
 </label>
 <label>
   圖示
-  <input id="newEmoji" maxlength="4" placeholder="🥭"></label><label>商品說明<input id="newDescription"></label></div><div class="variant-editor"><div class="section-head"><div><strong>販售規格</strong><p class="helper">共用上方基礎庫存。例：整箱扣 5 房、二房扣 2 房。</p></div><button id="addVariant" class="secondary compact" type="button">＋ 新增規格</button></div><div class="variant-head"><span>規格名稱</span><span>價格</span><span>販售單位</span><span>扣庫存</span><span></span></div><div id="variantRows"></div></div><button id="addProduct" class="primary compact">新增商品</button></div><div id="productAdminList"></div></section>
+  <input id="newEmoji" maxlength="4" placeholder="🥭"></label><label>商品說明<input id="newDescription"></label></div><div class="variant-editor"><div class="section-head"><div><strong>販售規格</strong><p class="helper">共用上方基礎庫存。例：整箱扣 5 房、二房扣 2 房。</p></div><button id="addVariant" class="secondary compact" type="button">＋ 新增規格</button></div><div class="variant-head"><span>規格名稱</span><span>價格</span><span>販售單位</span><span>扣庫存</span><span></span></div><div id="variantRows"></div></div><button id="addProduct" class="primary compact">新增商品</button></div><div class="product-status-toolbar"><strong>商品狀態</strong><select id="productStatusFilter"><option value="all">全部商品</option><option value="open">🟢 開放預約</option><option value="paused">🟡 暫停預約</option><option value="hidden">⚫ 結單／隱藏</option></select></div><div id="productAdminList"></div></section>
   <section id="staffPanel" class="panel hidden">
       <div class="panel-card">
         <div class="section-head compact-head"><div><h3>員工管理</h3><p class="helper">每位夥伴使用自己的 Email 登入。新增前，請先到 Supabase Authentication → Users 建立該帳號。</p></div><span id="staffRoleBadge" class="badge"></span></div>
@@ -156,7 +156,7 @@
       <label>基礎庫存單位<input id="editUnit" placeholder="例如：房、顆、斤"></label>
       <label>基礎庫存<input id="editStock" type="number" min="0"></label>
       <label class="full-span">商品說明<textarea id="editDescription" rows="3" placeholder="商品特色、規格補充等"></textarea></label>
-      <label>預約狀態<select id="editActive"><option value="true">開放預約</option><option value="false">結單／隱藏</option></select></label>
+      <label>預約狀態<select id="editActive"><option value="open">🟢 開放預約</option><option value="paused">🟡 暫停預約</option><option value="hidden">⚫ 結單／隱藏</option></select></label>
     </div>
   </div>
   <div class="variant-editor edit-variant-editor">
@@ -170,7 +170,7 @@
   </div>
 </dialog>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="config.js?v=staff-v2"></script>
+<script src="config.js?v=staff-v3"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="app.js?v=ui-v3"></script>
