@@ -81,7 +81,10 @@ function updateVariantCard(productId) {
 function changeVariantQty(productId, d) {
   const p = products.find(x => String(x.id) === String(productId)); if (!p) return; const v = selectedVariant(p), key = cartKey(p.id, v.id), current = cart[key]?.qty || 0;
   const otherCost = Object.values(cart).filter(x => String(x.product_id) === String(p.id) && x.variant_id !== v.id).reduce((s,x)=>s+x.qty*x.stock_cost,0); const max = Math.max(0, Math.floor((p.stock-otherCost)/v.stock_cost)); const n = Math.max(0, Math.min(max, current+d));
-  if (n) cart[key] = { product_id:p.id, variant_id:v.id, variant_name:v.name, unit:v.unit, price:v.price, stock_cost:v.stock_cost, qty:n }; else delete cart[key]; renderProducts(); renderCart();
+  if (n) cart[key] = { product_id:p.id, variant_id:v.id, variant_name:v.name, unit:v.unit, price:v.price, stock_cost:v.stock_cost, qty:n }; else delete cart[key];
+  // 只更新目前商品的數量/價格，不重建整個商品列表，避免每按一次 +/- 都重新建立所有圖片。
+  updateVariantCard(productId);
+  renderCart();
 }
 function renderCart() { const lines = Object.values(cart).map(x => ({...x,p:products.find(p=>String(p.id)===String(x.product_id))})).filter(x=>x.p); const total=lines.reduce((s,x)=>s+x.price*x.qty,0); $('cartCount').textContent=lines.length?`${lines.reduce((s,x)=>s+x.qty,0)} 件商品`:'尚未選商品'; $('cartSummary').innerHTML=lines.length?lines.map(x=>`<div class="cart-line"><span>${esc(x.p.emoji)} ${esc(x.p.name)}｜${esc(x.variant_name)} × ${x.qty}</span><strong>${money(x.price*x.qty)}</strong></div>`).join('')+`<div class="cart-line cart-total"><span>商品小計</span><span>${money(total)}</span></div>`:'請先選擇上方商品。' }
 async function openAdminDialog() {
@@ -444,7 +447,7 @@ async function updateOrder(id, status) { if (!adminSession) return alert('請先
 async function compressProductImage(file) {
   if (!file || !file.type?.startsWith('image/')) return file;
   const bitmap = await createImageBitmap(file);
-  const maxSide = 1400;
+  const maxSide = 1000;
   const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
   const width = Math.max(1, Math.round(bitmap.width * scale));
   const height = Math.max(1, Math.round(bitmap.height * scale));
@@ -453,7 +456,7 @@ async function compressProductImage(file) {
   const ctx = canvas.getContext('2d');
   ctx.drawImage(bitmap, 0, 0, width, height);
   bitmap.close?.();
-  const blob = await new Promise((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('圖片壓縮失敗')), 'image/jpeg', 0.78));
+  const blob = await new Promise((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('圖片壓縮失敗')), 'image/jpeg', 0.72));
   return blob.size < file.size ? blob : file;
 }
 async function uploadProductImage(file) {
