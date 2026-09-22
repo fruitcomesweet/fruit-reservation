@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>果來好甜｜水果預約保留</title>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css?v=ui-v5">
+  <link rel="stylesheet" href="styles.css?v=ui-v6">
 </head>
 <body>
 <header class="hero">
@@ -35,11 +35,11 @@
     <div class="section-head"><div><p class="eyebrow">TODAY'S FRUIT</p><h2>今天想留哪一份甜？</h2></div><span id="openStatus" class="tiny"></span></div>
     <div id="closedNotice" class="closed-notice hidden">
       <div class="closed-fruit">🍊</div>
-      <h2>今天的水果先收攤啦</h2>
-      <p class="closed-lead">謝謝大家今天把水果帶回家！</p>
-      <p>預訂系統將於隔日 11:30 前重新開啟</p>
-      <p>已經下單的果粉，仍可以在上方查詢訂單與 QR Code</p>
-      <small>明天再來看看有什麼新鮮水果吧 🍇</small>
+      <h2>今天的線上預訂先告一段落</h2>
+      <p class="closed-lead">謝謝大家今天的支持！</p>
+      <p>現場水果仍可依實際庫存選購。</p>
+      <p>預訂系統將於隔日 11:30 前重新開啟。</p>
+      <small>已下單的果粉，仍可以在上方查詢訂單與 QR Code。</small>
     </div>
     <div id="productGrid" class="product-grid"></div>
     <div id="emptyProducts" class="empty hidden">今天的商品還在準備中 🍊</div>
@@ -52,8 +52,8 @@
         <label>姓名<span>*</span><input id="name" maxlength="20" placeholder="例如：王小姐" required></label>
         <label>手機號碼<span>*</span><input id="phone" inputmode="numeric" maxlength="10" placeholder="09xxxxxxxx" required></label>
         <label>LINE 顯示名稱<input id="lineName" maxlength="30" placeholder="選填，方便小編核對"></label>
-        <label>取貨時段<span>*</span><select id="pickupTime" required><option value="">請選擇</option><option>14:00–18:00</option><option>18:00–20:00</option></select></label>
-        <label id="latePickupField" class="hidden">預計取貨時間<span>*</span><input id="latePickupExact" type="time" min="18:00" max="20:00" step="300"><small class="field-tip">18:00 後取貨請填寫預計時間，最晚 20:00。若臨時無法前往，請提前取消訂單或告知我們。</small></label>
+        <label>取貨時段<span>*</span><select id="pickupTime" required><option value="">請選擇</option><option>14:00–18:00</option><option>18:00後（時間到會電話確認是否來取）</option></select></label>
+        <label id="latePickupField" class="hidden">預計取貨時間<span>*</span><input id="latePickupExact" type="time" min="18:00" step="300"><small class="field-tip">18:00 後取貨請填寫預計時間，時間到若尚未取貨，我們會電話確認是否前來。</small></label>
       </div>
       <fieldset><legend>取貨方式<span>*</span></legend><div class="choice-row"><label class="choice"><input type="radio" name="method" value="現場自取" checked>🛍 現場自取</label><label class="choice"><input type="radio" name="method" value="Lalamove配送">🚗 Lalamove 配送</label></div></fieldset>
       <div id="deliveryFields" class="hidden lala-info">
@@ -174,7 +174,7 @@
 <script src="config.js?v=staff-v3"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script src="app.js?v=ui-v5"></script>
+<script src="app.js?v=ui-v6"></script>
 <script src="./password-feature.js?v=password-v4"></script>
 </body>
 </html>

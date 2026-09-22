@@ -141,7 +141,7 @@ function bind() {
   const lookupBtn = $('lookupMyOrders');
   if (lookupBtn) lookupBtn.onclick = lookupMyOrders;
   const syncLatePickup = () => {
-    const isLate = $('pickupTime')?.value === '18:00–20:00';
+    const isLate = $('pickupTime')?.value === '18:00後（時間到會電話確認是否來取）';
     $('latePickupField')?.classList.toggle('hidden', !isLate);
     if ($('latePickupExact')) $('latePickupExact').required = isLate;
     if (!isLate && $('latePickupExact')) $('latePickupExact').value = '';
@@ -162,11 +162,11 @@ async function submitOrder(e) {
   const method = document.querySelector('input[name="method"]:checked').value;
   const address = '';
   if (!name || !/^09\d{8}$/.test(phone) || !pickupRange || !$('agree').checked) return fail('請確認姓名、10碼手機、取貨時間與同意事項。');
-  if (pickupRange === '18:00–20:00') {
+  if (pickupRange === '18:00後（時間到會電話確認是否來取）') {
     if (!lateExact) return fail('18:00 後取貨請填寫預計取貨時間。');
-    if (lateExact < '18:00' || lateExact > '20:00') return fail('預計取貨時間請填寫 18:00～20:00 之間。');
+    if (lateExact < '18:00') return fail('預計取貨時間請填寫 18:00 之後。');
   }
-  const pickup = pickupRange === '18:00–20:00' ? `${pickupRange}｜預計 ${lateExact}` : pickupRange;
+  const pickup = pickupRange === '18:00後（時間到會電話確認是否來取）' ? `${pickupRange}｜預計 ${lateExact}` : pickupRange;
   const items = entries.map(x => { const p = products.find(y => String(y.id) === String(x.product_id)); return { product_id:p.id, name:p.name, unit:x.unit, price:x.price, qty:x.qty, emoji:p.emoji, variant_id:x.variant_id, variant_name:x.variant_name, stock_cost:x.stock_cost } });
   const costs={}; for (const i of items) costs[i.product_id]=(costs[i.product_id]||0)+i.qty*i.stock_cost;
   for (const [pid,cost] of Object.entries(costs)) { const p=products.find(x=>String(x.id)===String(pid)); if(!p||cost>p.stock) return fail(`${p?.name||'商品'} 庫存不足。`) }

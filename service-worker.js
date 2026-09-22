@@ -1,6 +1,6 @@
-const CACHE_NAME = 'fruit-staff-v5';
+const CACHE_NAME = 'fruit-staff-v6';
 const IMAGE_CACHE = 'fruit-product-images-v1';
-const ASSETS = ['./','./index.html','./styles.css?v=ui-v5','./app.js?v=ui-v5','./config.js?v=staff-v3'];
+const ASSETS = ['./','./index.html','./styles.css?v=ui-v6','./app.js?v=ui-v6','./config.js?v=staff-v3'];
 
 self.addEventListener('install', event => {
   self.skipWaiting();
