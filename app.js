@@ -3,7 +3,8 @@ const ONLINE = Boolean(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY && window.supab
 const db = ONLINE ? window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY) : null;
 const LS = { products: 'fruitFormal_products', orders: 'fruitFormal_orders', settings: 'fruitFormal_settings' };
 const defaults = { products: [{ id: 'mango', name: '金煌芒果', unit: '斤', price: 33, stock: 60, emoji: '🥭', description: '特A級，保留需最少3斤', active: true, sort_order: 1 }, { id: 'durian', name: '赤皇榴槤', unit: '顆', price: 499, stock: 20, emoji: '🌰', description: '明星牌特A果，單顆販售', active: true, sort_order: 2 }, { id: 'dragon', name: '白肉火龍果', unit: '斤', price: 39, stock: 90, emoji: '🐉', description: '清甜爽口，限量供應', active: true, sort_order: 3 }], settings: { location: '📍 板橋重慶黃昏市場', hours: '取貨時間 14:00–19:30｜商品限當日取貨', open: true } };
-let products = [], orders = [], settings = {}, cart = {}, adminSession = null, currentStaff = null, staffMembers = [], qrScanner = null, currentPickupOrder = null, productStatusFilter = 'all';
+let products = [], orders = [], settings = {}, cart = {}, adminSession = null, currentStaff = null, staffMembers = [], qrScanner = null, currentPickupOrder = null, productStatusFilter = 'all', noShowCounts = {};
+
 const selectedVariantByProduct = {}; // 記住每個商品目前選擇的規格，重新渲染時不跳回第一個
 const $ = id => document.getElementById(id), money = n => `$${Number(n).toLocaleString('zh-TW')}`, clone = x => JSON.parse(JSON.stringify(x));
 const load = (k, f) => { try { return JSON.parse(localStorage.getItem(k)) ?? clone(f) } catch { return clone(f) } };
@@ -26,10 +27,17 @@ async function refreshAll() {
   applySettings(); renderProducts(); renderCart();
 }
 async function refreshAdminOrders() {
-  if (!ONLINE || !adminSession) { orders = []; return; }
+  if (!ONLINE || !adminSession) { orders = []; noShowCounts = {}; return; }
   const o = await db.from('orders').select('*,order_items(*)').order('created_at', { ascending: false });
-  if (o.error) { console.error(o.error); alert('訂單讀取失敗，請確認已執行新版權限 SQL。'); orders = []; return; }
+  if (o.error) { console.error(o.error); alert('訂單讀取失敗，請確認已執行新版權限 SQL。'); orders = []; noShowCounts = {}; return; }
   orders = (o.data || []).map(x => ({ ...x, items: x.order_items || [] }));
+  const summary = await db.rpc('get_no_show_summary');
+  if (summary.error) {
+    console.warn('未取紀錄摘要讀取失敗', summary.error);
+    noShowCounts = {};
+  } else {
+    noShowCounts = Object.fromEntries((summary.data || []).map(x => [String(x.phone || ''), Number(x.no_show_count || 0)]));
+  }
 }
 function loadLocal() { products = load(LS.products, defaults.products); orders = load(LS.orders, []); settings = load(LS.settings, defaults.settings) }
 function applySettings() {
@@ -86,7 +94,37 @@ function changeVariantQty(productId, d) {
   updateVariantCard(productId);
   renderCart();
 }
-function renderCart() { const lines = Object.values(cart).map(x => ({...x,p:products.find(p=>String(p.id)===String(x.product_id))})).filter(x=>x.p); const total=lines.reduce((s,x)=>s+x.price*x.qty,0); $('cartCount').textContent=lines.length?`${lines.reduce((s,x)=>s+x.qty,0)} 件商品`:'尚未選商品'; $('cartSummary').innerHTML=lines.length?lines.map(x=>`<div class="cart-line"><span>${esc(x.p.emoji)} ${esc(x.p.name)}｜${esc(x.variant_name)} × ${x.qty}</span><strong>${money(x.price*x.qty)}</strong></div>`).join('')+`<div class="cart-line cart-total"><span>商品小計</span><span>${money(total)}</span></div>`:'請先選擇上方商品。' }
+function changeCartLineQty(encodedKey, delta) {
+  const key = decodeURIComponent(encodedKey);
+  const line = cart[key];
+  if (!line) return;
+  const p = products.find(x => String(x.id) === String(line.product_id));
+  if (!p) return;
+  const otherCost = Object.entries(cart).filter(([k]) => k !== key).filter(([,x]) => String(x.product_id) === String(p.id)).reduce((sum,[,x]) => sum + Number(x.qty || 0) * Number(x.stock_cost || 1), 0);
+  const max = Math.max(0, Math.floor((Number(p.stock || 0) - otherCost) / Math.max(1, Number(line.stock_cost || 1))));
+  const next = Math.max(0, Math.min(max, Number(line.qty || 0) + delta));
+  if (next > 0) cart[key].qty = next; else delete cart[key];
+  updateVariantCard(p.id);
+  renderCart();
+}
+function removeCartLine(encodedKey) {
+  const key = decodeURIComponent(encodedKey);
+  const line = cart[key];
+  if (!line) return;
+  const p = products.find(x => String(x.id) === String(line.product_id));
+  delete cart[key];
+  if (p) updateVariantCard(p.id);
+  renderCart();
+}
+function renderCart() {
+  const lines = Object.entries(cart).map(([key,x]) => ({...x,key,p:products.find(p=>String(p.id)===String(x.product_id))})).filter(x=>x.p);
+  const total = lines.reduce((s,x)=>s + Number(x.price || 0) * Number(x.qty || 0),0);
+  $('cartCount').textContent = lines.length ? `${lines.reduce((s,x)=>s+Number(x.qty||0),0)} 件商品` : '尚未選商品';
+  $('cartSummary').innerHTML = lines.length ? lines.map(x=>`<div class="cart-line cart-edit-line"><div class="cart-edit-main"><span>${esc(x.p.emoji)} ${esc(x.p.name)}｜${esc(x.variant_name)}</span><div class="cart-inline-controls"><button type="button" class="cart-mini-btn" data-cart-dec="${encodeURIComponent(x.key)}">−</button><strong>${x.qty}</strong><button type="button" class="cart-mini-btn" data-cart-inc="${encodeURIComponent(x.key)}">＋</button><button type="button" class="cart-remove-btn" data-cart-remove="${encodeURIComponent(x.key)}">移除</button></div></div><strong>${money(x.price*x.qty)}</strong></div>`).join('') + `<div class="cart-line cart-total"><span>商品小計</span><span>${money(total)}</span></div>` : '請先選擇上方商品。';
+  document.querySelectorAll('[data-cart-dec]').forEach(b => b.onclick = () => changeCartLineQty(b.dataset.cartDec, -1));
+  document.querySelectorAll('[data-cart-inc]').forEach(b => b.onclick = () => changeCartLineQty(b.dataset.cartInc, 1));
+  document.querySelectorAll('[data-cart-remove]').forEach(b => b.onclick = () => removeCartLine(b.dataset.cartRemove));
+}
 async function openAdminDialog() {
   const dialog = $('adminDialog');
   if (!dialog) return;
@@ -102,16 +140,63 @@ async function openAdminDialog() {
 function bind() {
   const lookupBtn = $('lookupMyOrders');
   if (lookupBtn) lookupBtn.onclick = lookupMyOrders;
+  const syncLatePickup = () => {
+    const isLate = $('pickupTime')?.value === '18:00–20:00';
+    $('latePickupField')?.classList.toggle('hidden', !isLate);
+    if ($('latePickupExact')) $('latePickupExact').required = isLate;
+    if (!isLate && $('latePickupExact')) $('latePickupExact').value = '';
+  };
+  if ($('pickupTime')) { $('pickupTime').onchange = syncLatePickup; syncLatePickup(); }
   document.querySelectorAll('input[name="method"]').forEach(r => r.onchange = () => { $('deliveryFields').classList.toggle('hidden', !(r.checked && r.value === 'Lalamove配送')) }); $('reservationForm').onsubmit = submitOrder; const adminBtn = $('openAdmin'); if (adminBtn) adminBtn.onclick = openAdminDialog; if (location.hash === '#admin') openAdminDialog(); window.addEventListener('hashchange', () => { if (location.hash === '#admin') openAdminDialog(); }); $('closeAdmin').onclick = () => $('adminDialog').close(); $('closeSuccess').onclick = () => $('successDialog').close(); $('unlockAdmin').onclick = unlock; $('logoutAdmin').onclick = logout; document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab)); $('statusFilter').onchange = renderOrders; $('orderSearch').oninput = renderOrders; $('exportOrders').onclick = exportCSV; $('addProduct').onclick = addProduct; $('addVariant').onclick = () => addVariantRow(); if ($('productStatusFilter')) $('productStatusFilter').onchange = e => { productStatusFilter = e.currentTarget.value; renderProductAdmin(); }; $('saveSettings').onclick = saveSettings; $('saveStaff').onclick = saveStaff; $('startQrScanner').onclick = startQrScanner; $('stopQrScanner').onclick = stopQrScanner; $('lookupPickupCode').onclick = () => lookupPickupCode($('manualPickupCode').value); $('manualPickupCode').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); lookupPickupCode(e.currentTarget.value) } }; $('closeEditProduct').onclick = () => $('editProductDialog').close(); $('editAddVariant').onclick = () => addEditVariantRow(); $('saveEditProduct').onclick = saveEditProduct; $('deleteProductFromEdit').onclick = deleteProductFromEdit; $('editImage').onchange = e => { const file = e.currentTarget.files?.[0]; if (!file) return; const url = URL.createObjectURL(file); $('editImagePreview').innerHTML = `<img src="${url}" alt="新商品照片預覽">`; }
 }
 async function submitOrder(e) {
-  e.preventDefault(); $('formMessage').textContent = ''; if (!settings.open) return fail('目前暫停預約。'); const entries = Object.values(cart); if (!entries.length) return fail('請先選擇至少一項商品。'); const name = $('name').value.trim(), phone = $('phone').value.trim(), pickup = $('pickupTime').value, method = document.querySelector('input[name="method"]:checked').value, address = ''; if (!name || !/^09\d{8}$/.test(phone) || !pickup || !$('agree').checked) return fail('請確認姓名、10碼手機、取貨時間與同意事項。'); const items = entries.map(x => { const p = products.find(y => String(y.id) === String(x.product_id)); return { product_id:p.id, name:p.name, unit:x.unit, price:x.price, qty:x.qty, emoji:p.emoji, variant_id:x.variant_id, variant_name:x.variant_name, stock_cost:x.stock_cost } }); const costs={}; for (const i of items) costs[i.product_id]=(costs[i.product_id]||0)+i.qty*i.stock_cost; for (const [pid,cost] of Object.entries(costs)) { const p=products.find(x=>String(x.id)===String(pid)); if(!p||cost>p.stock) return fail(`${p?.name||'商品'} 庫存不足。`) } const total = items.reduce((s, i) => s + i.price * i.qty, 0), status = method === 'Lalamove配送' ? '等待報價' : '未取'; let order;
-  try { if (ONLINE) { const rpc = await db.rpc('create_reservation', { p_name: name, p_phone: phone, p_line_name: $('lineName').value.trim(), p_pickup_time: pickup, p_method: method, p_address: address, p_note: $('note').value.trim(), p_status: status, p_items: items }); if (rpc.error) throw rpc.error; order = { ...rpc.data, items } } else { const id = `GL${new Date().toISOString().slice(5, 10).replace('-', '')}-${String(orders.length + 1).padStart(3, '0')}`; order = { id, created_at: new Date().toISOString(), name, phone, line_name: $('lineName').value.trim(), pickup_time: pickup, method, address, note: $('note').value.trim(), status, total, items }; orders.unshift(order); if (method === '現場自取') items.forEach(i => products.find(p => String(p.id) === String(i.product_id)).stock -= i.qty * (i.stock_cost || 1)); save(LS.orders, orders); save(LS.products, products) } } catch (err) { console.error(err); return fail('送出失敗，請稍後再試或聯絡小編。') }
-const dailyResult = await db.rpc('get_order_daily_number', {
-  p_order_id: order.id
-});
-if (!dailyResult.error) order.daily_number = dailyResult.data;
-  showSuccess(order); cart = {}; e.target.reset(); document.querySelector('input[value="現場自取"]').checked = true; $('deliveryFields').classList.add('hidden'); await refreshAll();
+  e.preventDefault();
+  $('formMessage').textContent = '';
+  if (!settings.open) return fail('目前暫停預約。');
+  const entries = Object.values(cart);
+  if (!entries.length) return fail('請先選擇至少一項商品。');
+  const name = $('name').value.trim();
+  const phone = $('phone').value.trim();
+  const pickupRange = $('pickupTime').value;
+  const lateExact = $('latePickupExact')?.value || '';
+  const method = document.querySelector('input[name="method"]:checked').value;
+  const address = '';
+  if (!name || !/^09\d{8}$/.test(phone) || !pickupRange || !$('agree').checked) return fail('請確認姓名、10碼手機、取貨時間與同意事項。');
+  if (pickupRange === '18:00–20:00') {
+    if (!lateExact) return fail('18:00 後取貨請填寫預計取貨時間。');
+    if (lateExact < '18:00' || lateExact > '20:00') return fail('預計取貨時間請填寫 18:00～20:00 之間。');
+  }
+  const pickup = pickupRange === '18:00–20:00' ? `${pickupRange}｜預計 ${lateExact}` : pickupRange;
+  const items = entries.map(x => { const p = products.find(y => String(y.id) === String(x.product_id)); return { product_id:p.id, name:p.name, unit:x.unit, price:x.price, qty:x.qty, emoji:p.emoji, variant_id:x.variant_id, variant_name:x.variant_name, stock_cost:x.stock_cost } });
+  const costs={}; for (const i of items) costs[i.product_id]=(costs[i.product_id]||0)+i.qty*i.stock_cost;
+  for (const [pid,cost] of Object.entries(costs)) { const p=products.find(x=>String(x.id)===String(pid)); if(!p||cost>p.stock) return fail(`${p?.name||'商品'} 庫存不足。`) }
+  const total = items.reduce((s, i) => s + i.price * i.qty, 0), status = method === 'Lalamove配送' ? '等待報價' : '未取';
+  let order;
+  try {
+    if (ONLINE) {
+      const rpc = await db.rpc('create_reservation_guarded', { p_name: name, p_phone: phone, p_line_name: $('lineName').value.trim(), p_pickup_time: pickup, p_method: method, p_address: address, p_note: $('note').value.trim(), p_status: status, p_items: items });
+      if (rpc.error) throw rpc.error;
+      order = { ...rpc.data, items };
+    } else {
+      const id = `GL${new Date().toISOString().slice(5, 10).replace('-', '')}-${String(orders.length + 1).padStart(3, '0')}`;
+      order = { id, created_at: new Date().toISOString(), name, phone, line_name: $('lineName').value.trim(), pickup_time: pickup, method, address, note: $('note').value.trim(), status, total, items };
+      orders.unshift(order);
+      if (method === '現場自取') items.forEach(i => products.find(p => String(p.id) === String(i.product_id)).stock -= i.qty * (i.stock_cost || 1));
+      save(LS.orders, orders); save(LS.products, products);
+    }
+  } catch (err) { console.error(err); return fail(err?.message || '送出失敗，請稍後再試或聯絡小編。') }
+  if (ONLINE) {
+    const dailyResult = await db.rpc('get_order_daily_number', { p_order_id: order.id });
+    if (!dailyResult.error) order.daily_number = dailyResult.data;
+  }
+  showSuccess(order);
+  cart = {};
+  e.target.reset();
+  document.querySelector('input[value="現場自取"]').checked = true;
+  $('deliveryFields').classList.add('hidden');
+  $('latePickupField')?.classList.add('hidden');
+  if ($('latePickupExact')) { $('latePickupExact').required = false; $('latePickupExact').value = ''; }
+  await refreshAll();
 }
 function fail(t) { $('formMessage').textContent = t }
 
@@ -184,17 +269,16 @@ async function lookupMyOrders() {
     ></div>
 
     ${order.status === '已取'
-        ? `<div class="pickup-done">
-             ✅ 此訂單已完成取貨
-             ${order.picked_up_at
-          ? `<br>${new Date(order.picked_up_at).toLocaleString('zh-TW')}`
-          : ''}
-           </div>`
+        ? `<div class="pickup-done">✅ 此訂單已完成取貨${order.picked_up_at ? `<br>${new Date(order.picked_up_at).toLocaleString('zh-TW')}` : ''}</div>`
         : order.status === '已取消'
           ? `<div class="pickup-cancelled">此訂單已取消</div>`
-          : `<p class="helper">取貨時請出示此 QR Code 給店員掃描。</p>`
+          : order.status === '等待店家確認'
+            ? `<div class="pending-confirm-note">⚠️ 此訂單正在等待店家確認，確認後才會正式保留庫存。</div>`
+            : order.status === '逾時未取'
+              ? `<div class="pickup-cancelled">此訂單已標記為逾時未取</div>`
+              : `<p class="helper">取貨時請出示此 QR Code 給店員掃描。</p>`
       }
-    ${['未取','已確認','等待報價'].includes(order.status) ? `<button class="lookup-cancel-btn danger" type="button" data-cancel-order="${esc(order.id || '')}" data-cancel-code="${esc(order.pickup_code || '')}">取消此訂單</button>` : ''}
+    ${['未取','已確認','等待報價','等待店家確認'].includes(order.status) ? `<button class="lookup-cancel-btn danger" type="button" data-cancel-order="${esc(order.id || '')}" data-cancel-code="${esc(order.pickup_code || '')}">取消此訂單</button>` : ''}
   </div>
 `).join('');
 
@@ -226,7 +310,7 @@ async function cancelCustomerOrder(orderId, phone, pickupCode) {
   if (!ok) return;
   try {
     if (ONLINE) {
-      const { error } = await db.rpc('cancel_customer_order', {
+      const { error } = await db.rpc('cancel_customer_order_safe', {
         p_order_id: orderId,
         p_phone: phone,
         p_pickup_code: pickupCode
@@ -234,8 +318,8 @@ async function cancelCustomerOrder(orderId, phone, pickupCode) {
       if (error) throw error;
     } else {
       const order = orders.find(o => o.id === orderId && o.phone === phone);
-      if (!order || ['已取','已取消'].includes(order.status)) throw new Error('此訂單目前無法取消');
-      if (order.method === '現場自取' || ['已確認','未取'].includes(order.status)) {
+      if (!order || ['已取','已取消','逾時未取'].includes(order.status)) throw new Error('此訂單目前無法取消');
+      if (['已確認','未取'].includes(order.status)) {
         (order.items || []).forEach(i => {
           const p = products.find(x => String(x.id) === String(i.product_id));
           if (p) p.stock += Number(i.qty || 0) * Math.max(1, Number(i.stock_cost || 1));
@@ -259,9 +343,11 @@ function showSuccess(o) {
   $('successContent').innerHTML = `
     <div class="success-head">
       <div class="success-fruit">🍊</div>
-      <h2>已收到預約</h2>
+      <h2>${o.status === '等待店家確認' ? '已收到預約，等待店家確認' : '已收到預約'}</h2>
+      ${o.status === '等待店家確認' ? '<div class="pending-confirm-note">⚠️ 此訂單需由店家確認後才會正式保留庫存，確認前請先不要前往取貨。</div>' : ''}
+      ${Number(o.no_show_count || 0) === 1 ? '<div class="pending-confirm-note">提醒：您先前曾有未取紀錄，若臨時無法前往，請記得提前取消訂單或告知店家，謝謝您。</div>' : ''}
       ${dailyNumber ? `<div class="daily-number-card"><span>今日取貨號碼</span><strong>${esc(dailyNumber)}</strong><small>號</small></div>` : ''}
-      <p>請截圖保存 QR Code，取貨時出示給店員</p>
+      <p>${o.status === '等待店家確認' ? '店家確認成立後，取貨時再出示此 QR Code' : '請截圖保存 QR Code，取貨時出示給店員'}</p>
     </div>
     <div id="customerQrCode" class="customer-qr"></div>
     <div class="success-number">${esc(pickupCode)}</div>
@@ -271,6 +357,7 @@ function showSuccess(o) {
     <div class="cart-line cart-total"><span>商品小計</span><span>${money(o.total)}</span></div>
     <div class="cart-line"><span>取貨</span><span>${esc(o.pickup_time || o.pickup)}／${esc(o.method)}</span></div>
     <div class="cart-line"><span>狀態</span><span>${esc(o.status)}</span></div>
+    <div class="success-cancel-reminder">若臨時無法取貨，請於「查詢我的訂單」中取消，讓商品可以重新釋出給其他客人，謝謝體諒 🍊</div>
     ${o.method === 'Lalamove配送' ? `<div class="lala-success-note"><strong>🚗 Lalamove 配送提醒</strong><p>請截圖本頁的訂購商品明細，並把以下配送資訊一起傳到官方 LINE：<b>@073nnpck</b></p><div>📌 配送地址：</div><div>💁🏻 收件人名字：</div><div>📱 收件人手機：</div><div>⏰ 方便配送時間：</div><div>🚗 配送備註：如放管理室、抵達後撥電話、需親自取件等。</div></div>` : ''}
     <p class="helper">QR Code 無法掃描時，也可以提供上方取貨碼。</p>`;
   $('successDialog').showModal();
@@ -423,6 +510,13 @@ function renderOrders() {
         <div class="admin-order-item-qty">× ${i.qty}</div>
         <div class="admin-order-item-price">${money(i.price)} / ${esc(i.unit)}</div>
       </div>`).join('');
+    const noShowCount = Number(noShowCounts[String(o.phone)] || 0);
+    const isOwner = currentStaff?.role === 'owner';
+    const statusButtons = [
+      ['未取','未取'], ['等待報價','等待報價'], ['已確認','已確認'], ['已取','已取'], ['已取消','已取消']
+    ].map(([status,label]) => `<button class="${o.status === status ? 'is-current' : ''}" data-order="${o.id}" data-status="${status}">${label}</button>`).join('') +
+      (['未取','已確認','逾時未取'].includes(o.status) ? `<button class="${o.status === '逾時未取' ? 'is-current' : ''}" data-order="${o.id}" data-status="逾時未取">標記未取</button>` : '');
+    const confirmButton = o.status === '等待店家確認' ? `<button class="confirm-reservation-btn" data-order="${o.id}" data-status="${o.method === 'Lalamove配送' ? '等待報價' : '未取'}">確認保留</button>` : '';
     return `<article class="order-item admin-order-card">
       <div class="admin-order-card-head">
         <div class="admin-order-number">${o.daily_number ? `<span>今日取貨號碼</span><strong>${esc(o.daily_number)} 號</strong>` : '<span>訂單</span><strong>未編號</strong>'}</div>
@@ -434,16 +528,60 @@ function renderOrders() {
         <span class="admin-order-id">${esc(o.id)}</span>
       </div>
       <div class="admin-order-meta"><span>⏰ ${esc(o.pickup_time || o.pickup)}</span><span>${o.method === 'Lalamove配送' ? '🚗' : '🛍'} ${esc(o.method)}</span></div>
+      ${noShowCount > 0 ? `<div class="no-show-warning"><strong>歷史未取：${noShowCount} 次</strong><span>${noShowCount >= 2 ? '⚠️ 此手機的新訂單需店家確認後才保留庫存' : '曾有未取紀錄'}</span><div class="no-show-tools"><button type="button" class="secondary compact" data-view-no-show="${esc(o.phone)}">查看紀錄</button>${isOwner ? `<button type="button" class="secondary compact" data-clear-no-show="${esc(o.phone)}">清除未取紀錄</button>` : ''}</div></div>` : ''}
+      ${o.status === '等待店家確認' ? `<div class="pending-admin-note">⚠️ 這筆訂單目前尚未扣庫存，請確認現場能保留後再按「確認保留」。</div>` : ''}
       <div class="admin-order-items">${itemRows || '<div class="helper">沒有商品明細</div>'}</div>
       ${o.note ? `<div class="admin-order-note"><strong>備註</strong><span>${esc(o.note)}</span></div>` : ''}
       <div class="admin-order-total"><span>訂單金額</span><strong>${money(o.total)}</strong></div>
-      <div class="order-actions">${['未取', '等待報價', '已確認', '已取', '已取消'].map(st => `<button class="${o.status === st ? 'is-current' : ''}" data-order="${o.id}" data-status="${st}">${st}</button>`).join('')}</div>
+      <div class="order-actions">${confirmButton}${statusButtons}${isOwner && o.status === '逾時未取' ? `<button class="secondary" type="button" data-revoke-no-show="${esc(o.id)}">撤銷這次未取紀錄</button>` : ''}</div>
     </article>`;
   }).join('') : '<div class="empty">目前沒有符合條件的訂單。</div>';
   document.querySelectorAll('[data-order]').forEach(b => b.onclick = () => updateOrder(b.dataset.order, b.dataset.status));
+  document.querySelectorAll('[data-view-no-show]').forEach(b => b.onclick = () => viewNoShowHistory(b.dataset.viewNoShow));
+  document.querySelectorAll('[data-clear-no-show]').forEach(b => b.onclick = () => clearNoShowHistory(b.dataset.clearNoShow));
+  document.querySelectorAll('[data-revoke-no-show]').forEach(b => b.onclick = () => revokeNoShowRecord(b.dataset.revokeNoShow));
   renderStats();
 }
-async function updateOrder(id, status) { if (!adminSession) return alert('請先登入後台'); if (ONLINE) { const r = await db.rpc('update_order_status', { p_order_id: id, p_new_status: status }); if (r.error) return alert(r.error.message) } else { const o = orders.find(x => x.id === id); o.status = status; save(LS.orders, orders) } await refreshAll(); renderAdmin() }
+async function updateOrder(id, status) {
+  if (!adminSession) return alert('請先登入後台');
+  if (status === '逾時未取' && !confirm('確定要把這筆訂單標記為「未取」嗎？\n系統會記錄一次未取，並把這筆訂單已保留的庫存釋回。')) return;
+  if (ONLINE) {
+    const r = await db.rpc('update_order_status_guarded', { p_order_id: id, p_new_status: status });
+    if (r.error) return alert(r.error.message);
+  } else {
+    const o = orders.find(x => x.id === id);
+    if (o) o.status = status;
+    save(LS.orders, orders);
+  }
+  await refreshAll();
+  await refreshAdminOrders();
+  renderAdmin();
+}
+async function viewNoShowHistory(phone) {
+  if (!adminSession || !phone) return;
+  const r = await db.rpc('get_no_show_history', { p_phone: phone });
+  if (r.error) return alert(r.error.message);
+  const rows = r.data || [];
+  if (!rows.length) return alert('目前沒有有效的未取紀錄。');
+  const text = rows.map(x => `${new Date(x.recorded_at).toLocaleString('zh-TW')}\n訂單：${x.order_id}`).join('\n\n');
+  alert(`未取紀錄｜${phone}\n\n${text}`);
+}
+async function clearNoShowHistory(phone) {
+  if (currentStaff?.role !== 'owner' || !phone) return;
+  if (!confirm(`確定要清除 ${phone} 的所有未取紀錄嗎？\n清除後未取次數會歸零。`)) return;
+  const r = await db.rpc('clear_customer_no_shows', { p_phone: phone });
+  if (r.error) return alert(r.error.message);
+  await refreshAdminOrders();
+  renderAdmin();
+}
+async function revokeNoShowRecord(orderId) {
+  if (currentStaff?.role !== 'owner' || !orderId) return;
+  if (!confirm('確定要撤銷這一次未取紀錄嗎？\n訂單狀態會維持不變，但這次不再計入未取次數。')) return;
+  const r = await db.rpc('revoke_no_show_record', { p_order_id: orderId });
+  if (r.error) return alert(r.error.message);
+  await refreshAdminOrders();
+  renderAdmin();
+}
 async function compressProductImage(file) {
   if (!file || !file.type?.startsWith('image/')) return file;
   const bitmap = await createImageBitmap(file);

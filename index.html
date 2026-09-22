@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>果來好甜｜水果預約保留</title>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css?v=ui-v3">
+  <link rel="stylesheet" href="styles.css?v=ui-v5">
 </head>
 <body>
 <header class="hero">
@@ -22,7 +22,7 @@
     <div class="order-lookup-box">
       <h3>查詢我的訂單</h3>
       <p class="helper">已經下單了嗎？輸入手機號碼即可快速查看今天的訂單與 QR Code。</p>
-      <p class="lookup-reorder-tip">想再加訂水果嗎？直接重新下單即可，每次加訂會產生新的 QR Code，取貨時請將所有 QR Code 一併出示。</p>
+      <p class="lookup-reorder-tip"><strong>想修改訂單嗎？</strong><br>加訂商品：請直接重新下一張新訂單。<br>減少或更換商品：請先取消原訂單，再重新下單。<br>每張新訂單都會產生新的 QR Code，取貨時請一併出示。</p>
       <div class="order-lookup-row">
         <input id="lookupPhone" inputmode="numeric" maxlength="10" placeholder="09xxxxxxxx">
         <button id="lookupMyOrders" class="secondary" type="button">查詢今日訂單</button>
@@ -52,7 +52,8 @@
         <label>姓名<span>*</span><input id="name" maxlength="20" placeholder="例如：王小姐" required></label>
         <label>手機號碼<span>*</span><input id="phone" inputmode="numeric" maxlength="10" placeholder="09xxxxxxxx" required></label>
         <label>LINE 顯示名稱<input id="lineName" maxlength="30" placeholder="選填，方便小編核對"></label>
-        <label>取貨時段<span>*</span><select id="pickupTime" required><option value="">請選擇</option><option>14:00–16:00</option><option>16:00–18:30</option><option>18:30後（我一定會來，不來也會告知）</option></select></label>
+        <label>取貨時段<span>*</span><select id="pickupTime" required><option value="">請選擇</option><option>14:00–18:00</option><option>18:00–20:00</option></select></label>
+        <label id="latePickupField" class="hidden">預計取貨時間<span>*</span><input id="latePickupExact" type="time" min="18:00" max="20:00" step="300"><small class="field-tip">18:00 後取貨請填寫預計時間，最晚 20:00。若臨時無法前往，請提前取消訂單或告知我們。</small></label>
       </div>
       <fieldset><legend>取貨方式<span>*</span></legend><div class="choice-row"><label class="choice"><input type="radio" name="method" value="現場自取" checked>🛍 現場自取</label><label class="choice"><input type="radio" name="method" value="Lalamove配送">🚗 Lalamove 配送</label></div></fieldset>
       <div id="deliveryFields" class="hidden lala-info">
@@ -112,7 +113,7 @@
       <div id="pickupResult"></div>
     </section>
 
-    <section id="ordersPanel" class="panel"><div id="stats" class="stats"></div><div class="toolbar"><select id="statusFilter"><option value="all">全部狀態</option><option>未取</option><option>等待報價</option><option>已確認</option><option>已取</option><option>已取消</option></select><input id="orderSearch" placeholder="搜尋姓名、電話、編號"><button id="exportOrders" class="secondary">匯出 CSV</button></div><div id="orderList"></div></section>
+    <section id="ordersPanel" class="panel"><div id="stats" class="stats"></div><div class="toolbar"><select id="statusFilter"><option value="all">全部狀態</option><option>未取</option><option>等待店家確認</option><option>等待報價</option><option>已確認</option><option>已取</option><option>已取消</option><option>逾時未取</option></select><input id="orderSearch" placeholder="搜尋姓名、電話、編號"><button id="exportOrders" class="secondary">匯出 CSV</button></div><div id="orderList"></div></section>
     <section id="productsPanel" class="panel hidden"><div class="panel-card"><h3>新增商品</h3><div class="form-grid admin-form"><label>商品名稱<input id="newName"></label><label>基礎庫存單位<input id="newUnit" placeholder="例如：房、顆、斤"></label><label>基礎庫存<input id="newStock" type="number" min="0" placeholder="例如：150"></label><input id="newPrice" type="hidden" value="0">
       <label>
   商品照片
@@ -173,7 +174,7 @@
 <script src="config.js?v=staff-v3"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script src="app.js?v=ui-v4"></script>
+<script src="app.js?v=ui-v5"></script>
 <script src="./password-feature.js?v=password-v4"></script>
 </body>
 </html>
