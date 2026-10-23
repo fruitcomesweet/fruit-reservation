@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>果來好甜｜水果預約保留</title>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css?v=ui-v6">
+  <link rel="stylesheet" href="styles.css?v=ui-v7">
 </head>
 <body>
 <header class="hero">
@@ -113,7 +113,7 @@
       <div id="pickupResult"></div>
     </section>
 
-    <section id="ordersPanel" class="panel"><div id="stats" class="stats"></div><div class="toolbar"><select id="statusFilter"><option value="all">全部狀態</option><option>未取</option><option>等待店家確認</option><option>等待報價</option><option>已確認</option><option>已取</option><option>已取消</option><option>逾時未取</option></select><input id="orderSearch" placeholder="搜尋姓名、電話、編號"><button id="exportOrders" class="secondary">匯出 CSV</button></div><div id="orderList"></div></section>
+    <section id="ordersPanel" class="panel"><div id="stats" class="stats"></div><div class="toolbar"><select id="statusFilter"><option value="all">全部狀態</option><option>未取</option><option>等待報價</option><option>已確認</option><option>已取</option><option>已取消</option></select><input id="orderSearch" placeholder="搜尋姓名、電話、編號"><button id="exportOrders" class="secondary">匯出 CSV</button></div><div id="orderList"></div></section>
     <section id="productsPanel" class="panel hidden"><div class="panel-card"><h3>新增商品</h3><div class="form-grid admin-form"><label>商品名稱<input id="newName"></label><label>基礎庫存單位<input id="newUnit" placeholder="例如：房、顆、斤"></label><label>基礎庫存<input id="newStock" type="number" min="0" placeholder="例如：150"></label><input id="newPrice" type="hidden" value="0">
       <label>
   商品照片
@@ -174,7 +174,7 @@
 <script src="config.js?v=staff-v3"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script src="app.js?v=ui-v6"></script>
+<script src="app.js?v=ui-v7"></script>
 <script src="./password-feature.js?v=password-v4"></script>
 </body>
 </html>

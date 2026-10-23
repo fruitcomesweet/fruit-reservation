@@ -3,7 +3,7 @@ const ONLINE = Boolean(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY && window.supab
 const db = ONLINE ? window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY) : null;
 const LS = { products: 'fruitFormal_products', orders: 'fruitFormal_orders', settings: 'fruitFormal_settings' };
 const defaults = { products: [{ id: 'mango', name: '金煌芒果', unit: '斤', price: 33, stock: 60, emoji: '🥭', description: '特A級，保留需最少3斤', active: true, sort_order: 1 }, { id: 'durian', name: '赤皇榴槤', unit: '顆', price: 499, stock: 20, emoji: '🌰', description: '明星牌特A果，單顆販售', active: true, sort_order: 2 }, { id: 'dragon', name: '白肉火龍果', unit: '斤', price: 39, stock: 90, emoji: '🐉', description: '清甜爽口，限量供應', active: true, sort_order: 3 }], settings: { location: '📍 板橋重慶黃昏市場', hours: '取貨時間 14:00–19:30｜商品限當日取貨', open: true } };
-let products = [], orders = [], settings = {}, cart = {}, adminSession = null, currentStaff = null, staffMembers = [], qrScanner = null, currentPickupOrder = null, productStatusFilter = 'all', noShowCounts = {};
+let products = [], orders = [], settings = {}, cart = {}, adminSession = null, currentStaff = null, staffMembers = [], qrScanner = null, currentPickupOrder = null, productStatusFilter = 'all';
 
 const selectedVariantByProduct = {}; // 記住每個商品目前選擇的規格，重新渲染時不跳回第一個
 const $ = id => document.getElementById(id), money = n => `$${Number(n).toLocaleString('zh-TW')}`, clone = x => JSON.parse(JSON.stringify(x));
@@ -27,17 +27,10 @@ async function refreshAll() {
   applySettings(); renderProducts(); renderCart();
 }
 async function refreshAdminOrders() {
-  if (!ONLINE || !adminSession) { orders = []; noShowCounts = {}; return; }
+  if (!ONLINE || !adminSession) { orders = []; return; }
   const o = await db.from('orders').select('*,order_items(*)').order('created_at', { ascending: false });
-  if (o.error) { console.error(o.error); alert('訂單讀取失敗，請確認已執行新版權限 SQL。'); orders = []; noShowCounts = {}; return; }
+  if (o.error) { console.error(o.error); alert('訂單讀取失敗，請確認已執行新版權限 SQL。'); orders = []; return; }
   orders = (o.data || []).map(x => ({ ...x, items: x.order_items || [] }));
-  const summary = await db.rpc('get_no_show_summary');
-  if (summary.error) {
-    console.warn('未取紀錄摘要讀取失敗', summary.error);
-    noShowCounts = {};
-  } else {
-    noShowCounts = Object.fromEntries((summary.data || []).map(x => [String(x.phone || ''), Number(x.no_show_count || 0)]));
-  }
 }
 function loadLocal() { products = load(LS.products, defaults.products); orders = load(LS.orders, []); settings = load(LS.settings, defaults.settings) }
 function applySettings() {
@@ -174,7 +167,7 @@ async function submitOrder(e) {
   let order;
   try {
     if (ONLINE) {
-      const rpc = await db.rpc('create_reservation_guarded', { p_name: name, p_phone: phone, p_line_name: $('lineName').value.trim(), p_pickup_time: pickup, p_method: method, p_address: address, p_note: $('note').value.trim(), p_status: status, p_items: items });
+      const rpc = await db.rpc('create_reservation', { p_name: name, p_phone: phone, p_line_name: $('lineName').value.trim(), p_pickup_time: pickup, p_method: method, p_address: address, p_note: $('note').value.trim(), p_status: status, p_items: items });
       if (rpc.error) throw rpc.error;
       order = { ...rpc.data, items };
     } else {
@@ -272,13 +265,9 @@ async function lookupMyOrders() {
         ? `<div class="pickup-done">✅ 此訂單已完成取貨${order.picked_up_at ? `<br>${new Date(order.picked_up_at).toLocaleString('zh-TW')}` : ''}</div>`
         : order.status === '已取消'
           ? `<div class="pickup-cancelled">此訂單已取消</div>`
-          : order.status === '等待店家確認'
-            ? `<div class="pending-confirm-note">⚠️ 此訂單正在等待店家確認，確認後才會正式保留庫存。</div>`
-            : order.status === '逾時未取'
-              ? `<div class="pickup-cancelled">此訂單已標記為逾時未取</div>`
-              : `<p class="helper">取貨時請出示此 QR Code 給店員掃描。</p>`
+          : `<p class="helper">取貨時請出示此 QR Code 給店員掃描。</p>`
       }
-    ${['未取','已確認','等待報價','等待店家確認'].includes(order.status) ? `<button class="lookup-cancel-btn danger" type="button" data-cancel-order="${esc(order.id || '')}" data-cancel-code="${esc(order.pickup_code || '')}">取消此訂單</button>` : ''}
+    ${['未取','已確認','等待報價'].includes(order.status) ? `<button class="lookup-cancel-btn danger" type="button" data-cancel-order="${esc(order.id || '')}" data-cancel-code="${esc(order.pickup_code || '')}">取消此訂單</button>` : ''}
   </div>
 `).join('');
 
@@ -318,7 +307,7 @@ async function cancelCustomerOrder(orderId, phone, pickupCode) {
       if (error) throw error;
     } else {
       const order = orders.find(o => o.id === orderId && o.phone === phone);
-      if (!order || ['已取','已取消','逾時未取'].includes(order.status)) throw new Error('此訂單目前無法取消');
+      if (!order || ['已取','已取消'].includes(order.status)) throw new Error('此訂單目前無法取消');
       if (['已確認','未取'].includes(order.status)) {
         (order.items || []).forEach(i => {
           const p = products.find(x => String(x.id) === String(i.product_id));
@@ -343,11 +332,9 @@ function showSuccess(o) {
   $('successContent').innerHTML = `
     <div class="success-head">
       <div class="success-fruit">🍊</div>
-      <h2>${o.status === '等待店家確認' ? '已收到預約，等待店家確認' : '已收到預約'}</h2>
-      ${o.status === '等待店家確認' ? '<div class="pending-confirm-note">⚠️ 此訂單需由店家確認後才會正式保留庫存，確認前請先不要前往取貨。</div>' : ''}
-      ${Number(o.no_show_count || 0) === 1 ? '<div class="pending-confirm-note">提醒：您先前曾有未取紀錄，若臨時無法前往，請記得提前取消訂單或告知店家，謝謝您。</div>' : ''}
+      <h2>已收到預約</h2>
       ${dailyNumber ? `<div class="daily-number-card"><span>今日取貨號碼</span><strong>${esc(dailyNumber)}</strong><small>號</small></div>` : ''}
-      <p>${o.status === '等待店家確認' ? '店家確認成立後，取貨時再出示此 QR Code' : '請截圖保存 QR Code，取貨時出示給店員'}</p>
+      <p>請截圖保存 QR Code，取貨時出示給店員</p>
     </div>
     <div id="customerQrCode" class="customer-qr"></div>
     <div class="success-number">${esc(pickupCode)}</div>
@@ -510,13 +497,9 @@ function renderOrders() {
         <div class="admin-order-item-qty">× ${i.qty}</div>
         <div class="admin-order-item-price">${money(i.price)} / ${esc(i.unit)}</div>
       </div>`).join('');
-    const noShowCount = Number(noShowCounts[String(o.phone)] || 0);
-    const isOwner = currentStaff?.role === 'owner';
     const statusButtons = [
       ['未取','未取'], ['等待報價','等待報價'], ['已確認','已確認'], ['已取','已取'], ['已取消','已取消']
-    ].map(([status,label]) => `<button class="${o.status === status ? 'is-current' : ''}" data-order="${o.id}" data-status="${status}">${label}</button>`).join('') +
-      (['未取','已確認','逾時未取'].includes(o.status) ? `<button class="${o.status === '逾時未取' ? 'is-current' : ''}" data-order="${o.id}" data-status="逾時未取">標記未取</button>` : '');
-    const confirmButton = o.status === '等待店家確認' ? `<button class="confirm-reservation-btn" data-order="${o.id}" data-status="${o.method === 'Lalamove配送' ? '等待報價' : '未取'}">確認保留</button>` : '';
+    ].map(([status,label]) => `<button class="${o.status === status ? 'is-current' : ''}" data-order="${o.id}" data-status="${status}">${label}</button>`).join('');
     return `<article class="order-item admin-order-card">
       <div class="admin-order-card-head">
         <div class="admin-order-number">${o.daily_number ? `<span>今日取貨號碼</span><strong>${esc(o.daily_number)} 號</strong>` : '<span>訂單</span><strong>未編號</strong>'}</div>
@@ -528,25 +511,19 @@ function renderOrders() {
         <span class="admin-order-id">${esc(o.id)}</span>
       </div>
       <div class="admin-order-meta"><span>⏰ ${esc(o.pickup_time || o.pickup)}</span><span>${o.method === 'Lalamove配送' ? '🚗' : '🛍'} ${esc(o.method)}</span></div>
-      ${noShowCount > 0 ? `<div class="no-show-warning"><strong>歷史未取：${noShowCount} 次</strong><span>${noShowCount >= 2 ? '⚠️ 此手機的新訂單需店家確認後才保留庫存' : '曾有未取紀錄'}</span><div class="no-show-tools"><button type="button" class="secondary compact" data-view-no-show="${esc(o.phone)}">查看紀錄</button>${isOwner ? `<button type="button" class="secondary compact" data-clear-no-show="${esc(o.phone)}">清除未取紀錄</button>` : ''}</div></div>` : ''}
-      ${o.status === '等待店家確認' ? `<div class="pending-admin-note">⚠️ 這筆訂單目前尚未扣庫存，請確認現場能保留後再按「確認保留」。</div>` : ''}
       <div class="admin-order-items">${itemRows || '<div class="helper">沒有商品明細</div>'}</div>
       ${o.note ? `<div class="admin-order-note"><strong>備註</strong><span>${esc(o.note)}</span></div>` : ''}
       <div class="admin-order-total"><span>訂單金額</span><strong>${money(o.total)}</strong></div>
-      <div class="order-actions">${confirmButton}${statusButtons}${isOwner && o.status === '逾時未取' ? `<button class="secondary" type="button" data-revoke-no-show="${esc(o.id)}">撤銷這次未取紀錄</button>` : ''}</div>
+      <div class="order-actions">${statusButtons}</div>
     </article>`;
   }).join('') : '<div class="empty">目前沒有符合條件的訂單。</div>';
   document.querySelectorAll('[data-order]').forEach(b => b.onclick = () => updateOrder(b.dataset.order, b.dataset.status));
-  document.querySelectorAll('[data-view-no-show]').forEach(b => b.onclick = () => viewNoShowHistory(b.dataset.viewNoShow));
-  document.querySelectorAll('[data-clear-no-show]').forEach(b => b.onclick = () => clearNoShowHistory(b.dataset.clearNoShow));
-  document.querySelectorAll('[data-revoke-no-show]').forEach(b => b.onclick = () => revokeNoShowRecord(b.dataset.revokeNoShow));
   renderStats();
 }
 async function updateOrder(id, status) {
   if (!adminSession) return alert('請先登入後台');
-  if (status === '逾時未取' && !confirm('確定要把這筆訂單標記為「未取」嗎？\n系統會記錄一次未取，並把這筆訂單已保留的庫存釋回。')) return;
   if (ONLINE) {
-    const r = await db.rpc('update_order_status_guarded', { p_order_id: id, p_new_status: status });
+    const r = await db.rpc('update_order_status', { p_order_id: id, p_new_status: status });
     if (r.error) return alert(r.error.message);
   } else {
     const o = orders.find(x => x.id === id);
@@ -554,31 +531,6 @@ async function updateOrder(id, status) {
     save(LS.orders, orders);
   }
   await refreshAll();
-  await refreshAdminOrders();
-  renderAdmin();
-}
-async function viewNoShowHistory(phone) {
-  if (!adminSession || !phone) return;
-  const r = await db.rpc('get_no_show_history', { p_phone: phone });
-  if (r.error) return alert(r.error.message);
-  const rows = r.data || [];
-  if (!rows.length) return alert('目前沒有有效的未取紀錄。');
-  const text = rows.map(x => `${new Date(x.recorded_at).toLocaleString('zh-TW')}\n訂單：${x.order_id}`).join('\n\n');
-  alert(`未取紀錄｜${phone}\n\n${text}`);
-}
-async function clearNoShowHistory(phone) {
-  if (currentStaff?.role !== 'owner' || !phone) return;
-  if (!confirm(`確定要清除 ${phone} 的所有未取紀錄嗎？\n清除後未取次數會歸零。`)) return;
-  const r = await db.rpc('clear_customer_no_shows', { p_phone: phone });
-  if (r.error) return alert(r.error.message);
-  await refreshAdminOrders();
-  renderAdmin();
-}
-async function revokeNoShowRecord(orderId) {
-  if (currentStaff?.role !== 'owner' || !orderId) return;
-  if (!confirm('確定要撤銷這一次未取紀錄嗎？\n訂單狀態會維持不變，但這次不再計入未取次數。')) return;
-  const r = await db.rpc('revoke_no_show_record', { p_order_id: orderId });
-  if (r.error) return alert(r.error.message);
   await refreshAdminOrders();
   renderAdmin();
 }
@@ -802,10 +754,24 @@ async function refreshStaff() {
 }
 function renderStaff() {
   if (currentStaff?.role !== 'owner') return;
-  $('staffList').innerHTML = staffMembers.length ? staffMembers.map(m => `<article class="staff-card"><div class="staff-card-top"><div><strong>${esc(m.display_name || '未命名')}</strong><div class="staff-email">${esc(m.email)}</div></div><div class="staff-tags"><span class="role-chip">${roleLabel(m.role)}</span><span class="active-chip ${m.is_active ? 'on' : 'off'}">${m.is_active ? '啟用' : '停用'}</span></div></div><div class="staff-actions"><input value="${esc(m.display_name || '')}" data-staff-name="${m.user_id}" aria-label="員工姓名"><select data-staff-role="${m.user_id}"><option value="owner" ${m.role === 'owner' ? 'selected' : ''}>老闆</option><option value="manager" ${m.role === 'manager' ? 'selected' : ''}>管理員</option><option value="order_staff" ${m.role === 'order_staff' ? 'selected' : ''}>訂單人員</option></select><button class="secondary" data-staff-toggle="${m.user_id}" data-active="${m.is_active}">${m.is_active ? '停用' : '啟用'}</button></div></article>`).join('') : '<div class="empty">目前還沒有其他員工。</div>';
-  document.querySelectorAll('[data-staff-name]').forEach(el => el.onchange = () => updateStaffCard(el.dataset.staffName));
-  document.querySelectorAll('[data-staff-role]').forEach(el => el.onchange = () => updateStaffCard(el.dataset.staffRole));
+  $('staffList').innerHTML = staffMembers.length ? staffMembers.map(m => `<article class="staff-card" data-staff-card="${m.user_id}"><div class="staff-card-top"><div><strong>${esc(m.display_name || '未命名')}</strong><div class="staff-email">${esc(m.email)}</div></div><div class="staff-tags"><span class="role-chip">${roleLabel(m.role)}</span><span class="active-chip ${m.is_active ? 'on' : 'off'}">${m.is_active ? '啟用' : '停用'}</span></div></div><div class="staff-actions"><input value="${esc(m.display_name || '')}" data-staff-name="${m.user_id}" aria-label="員工姓名"><select data-staff-role="${m.user_id}"><option value="owner" ${m.role === 'owner' ? 'selected' : ''}>老闆</option><option value="manager" ${m.role === 'manager' ? 'selected' : ''}>管理員</option><option value="order_staff" ${m.role === 'order_staff' ? 'selected' : ''}>訂單人員</option></select><div class="staff-action-buttons"><button class="primary staff-save-btn" data-staff-save="${m.user_id}">儲存修改</button><button class="secondary" data-staff-toggle="${m.user_id}" data-active="${m.is_active}">${m.is_active ? '停用' : '啟用'}</button></div></div></article>`).join('') : '<div class="empty">目前還沒有其他員工。</div>';
+  document.querySelectorAll('[data-staff-save]').forEach(el => el.onclick = () => saveStaffChanges(el.dataset.staffSave));
   document.querySelectorAll('[data-staff-toggle]').forEach(el => el.onclick = () => toggleStaff(el.dataset.staffToggle, el.dataset.active !== 'true'));
+}
+async function saveStaffChanges(userId) {
+  if (currentStaff?.role !== 'owner') return alert('只有老闆可以管理員工。');
+  const m = staffMembers.find(x => x.user_id === userId); if (!m) return;
+  const nameEl = document.querySelector(`[data-staff-name="${CSS.escape(userId)}"]`);
+  const roleEl = document.querySelector(`[data-staff-role="${CSS.escape(userId)}"]`);
+  const displayName = (nameEl?.value || '').trim();
+  const role = roleEl?.value || m.role;
+  if (!displayName) return alert('員工姓名不能留空。');
+  if (!confirm(`確定儲存 ${displayName} 的員工資料嗎？`)) return;
+  const r = await db.rpc('update_staff_member', { p_user_id: userId, p_display_name: displayName, p_role: role, p_is_active: Boolean(m.is_active) });
+  if (r.error) return alert(r.error.message);
+  alert('員工資料已更新 ✅');
+  await refreshStaff();
+  renderStaff();
 }
 async function saveStaff() {
   if (currentStaff?.role !== 'owner') {
