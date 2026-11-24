@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>果來好甜｜水果預約保留</title>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css?v=ui-v7">
+  <link rel="stylesheet" href="styles.css?v=ui-v8">
 </head>
 <body>
 <header class="hero">
@@ -121,7 +121,9 @@
 </label>
 <label>
   圖示
-  <input id="newEmoji" maxlength="4" placeholder="🥭"></label><label>商品說明<input id="newDescription"></label></div><div class="variant-editor"><div class="section-head"><div><strong>販售規格</strong><p class="helper">共用上方基礎庫存。例：整箱扣 5 房、二房扣 2 房。</p></div><button id="addVariant" class="secondary compact" type="button">＋ 新增規格</button></div><div class="variant-head"><span>規格名稱</span><span>價格</span><span>販售單位</span><span>扣庫存</span><span></span></div><div id="variantRows"></div></div><button id="addProduct" class="primary compact">新增商品</button></div><div class="product-status-toolbar"><strong>商品狀態</strong><select id="productStatusFilter"><option value="all">全部商品</option><option value="open">🟢 開放預約</option><option value="paused">🟡 暫停預約</option><option value="hidden">⚫ 結單／隱藏</option></select></div><div id="productAdminList"></div></section>
+  <input id="newEmoji" maxlength="4" placeholder="🥭"></label><label>商品說明<input id="newDescription"></label></div><div class="variant-editor"><div class="section-head"><div><strong>販售規格</strong><p class="helper">共用上方基礎庫存。例：整箱扣 5 房、二房扣 2 房。</p></div><button id="addVariant" class="secondary compact" type="button">＋ 新增規格</button></div><div class="variant-head"><span>規格名稱</span><span>價格</span><span>販售單位</span><span>扣庫存</span><span></span></div><div id="variantRows"></div></div><button id="addProduct" class="primary compact">新增商品</button></div><div class="panel-card quick-listing-card"><div class="section-head compact-head"><div><h3>今日快速上架</h3><p class="helper">一行一個品項，格式：品項｜規格價格｜庫存。只更新既有商品，沒列入今天清單的商品會在確認後隱藏。</p></div></div><textarea id="quickListingText" rows="6" placeholder="韓國麝香葡萄｜一房180、兩房350、整箱980｜庫存30
+紅肉木瓜｜一斤39｜庫存80
+紫樽百香果｜一包179、整箱750｜庫存12"></textarea><div class="quick-listing-actions"><button id="parseQuickListing" class="secondary compact" type="button">解析商品</button><button id="clearQuickListing" class="secondary compact hidden" type="button">清除</button></div><p id="quickListingMessage" class="helper quick-listing-message">貼上後先解析預覽，不會直接修改商品。</p><div id="quickListingPreview"></div><button id="applyQuickListing" class="primary hidden" type="button">確認套用今日上架</button></div><div class="product-tools"><div class="product-search-box"><input id="productSearch" type="search" placeholder="🔍 搜尋商品、規格、描述"><button id="clearProductSearch" class="secondary compact" type="button">清除</button></div><div class="product-status-toolbar"><div><strong>商品狀態</strong><small id="productSearchCount">共 0 項商品</small></div><select id="productStatusFilter"><option value="all">全部商品</option><option value="open">🟢 開放預約</option><option value="paused">🟡 暫停預約</option><option value="hidden">⚫ 結單／隱藏</option></select></div></div><div id="productAdminList"></div></section>
   <section id="staffPanel" class="panel hidden">
       <div class="panel-card">
         <div class="section-head compact-head"><div><h3>員工管理</h3><p class="helper">每位夥伴使用自己的 Email 登入。新增前，請先到 Supabase Authentication → Users 建立該帳號。</p></div><span id="staffRoleBadge" class="badge"></span></div>
@@ -174,7 +176,7 @@
 <script src="config.js?v=staff-v3"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script src="app.js?v=ui-v7"></script>
+<script src="app.js?v=ui-v8"></script>
 <script src="./password-feature.js?v=password-v4"></script>
 </body>
 </html>

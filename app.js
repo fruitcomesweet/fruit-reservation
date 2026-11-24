@@ -3,7 +3,7 @@ const ONLINE = Boolean(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY && window.supab
 const db = ONLINE ? window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY) : null;
 const LS = { products: 'fruitFormal_products', orders: 'fruitFormal_orders', settings: 'fruitFormal_settings' };
 const defaults = { products: [{ id: 'mango', name: '金煌芒果', unit: '斤', price: 33, stock: 60, emoji: '🥭', description: '特A級，保留需最少3斤', active: true, sort_order: 1 }, { id: 'durian', name: '赤皇榴槤', unit: '顆', price: 499, stock: 20, emoji: '🌰', description: '明星牌特A果，單顆販售', active: true, sort_order: 2 }, { id: 'dragon', name: '白肉火龍果', unit: '斤', price: 39, stock: 90, emoji: '🐉', description: '清甜爽口，限量供應', active: true, sort_order: 3 }], settings: { location: '📍 板橋重慶黃昏市場', hours: '取貨時間 14:00–19:30｜商品限當日取貨', open: true } };
-let products = [], orders = [], settings = {}, cart = {}, adminSession = null, currentStaff = null, staffMembers = [], qrScanner = null, currentPickupOrder = null, productStatusFilter = 'all';
+let products = [], orders = [], settings = {}, cart = {}, adminSession = null, currentStaff = null, staffMembers = [], qrScanner = null, currentPickupOrder = null, productStatusFilter = 'all', productSearchQuery = '', quickListingDraft = [];
 
 const selectedVariantByProduct = {}; // 記住每個商品目前選擇的規格，重新渲染時不跳回第一個
 const $ = id => document.getElementById(id), money = n => `$${Number(n).toLocaleString('zh-TW')}`, clone = x => JSON.parse(JSON.stringify(x));
@@ -140,7 +140,7 @@ function bind() {
     if (!isLate && $('latePickupExact')) $('latePickupExact').value = '';
   };
   if ($('pickupTime')) { $('pickupTime').onchange = syncLatePickup; syncLatePickup(); }
-  document.querySelectorAll('input[name="method"]').forEach(r => r.onchange = () => { $('deliveryFields').classList.toggle('hidden', !(r.checked && r.value === 'Lalamove配送')) }); $('reservationForm').onsubmit = submitOrder; const adminBtn = $('openAdmin'); if (adminBtn) adminBtn.onclick = openAdminDialog; if (location.hash === '#admin') openAdminDialog(); window.addEventListener('hashchange', () => { if (location.hash === '#admin') openAdminDialog(); }); $('closeAdmin').onclick = () => $('adminDialog').close(); $('closeSuccess').onclick = () => $('successDialog').close(); $('unlockAdmin').onclick = unlock; $('logoutAdmin').onclick = logout; document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab)); $('statusFilter').onchange = renderOrders; $('orderSearch').oninput = renderOrders; $('exportOrders').onclick = exportCSV; $('addProduct').onclick = addProduct; $('addVariant').onclick = () => addVariantRow(); if ($('productStatusFilter')) $('productStatusFilter').onchange = e => { productStatusFilter = e.currentTarget.value; renderProductAdmin(); }; $('saveSettings').onclick = saveSettings; $('saveStaff').onclick = saveStaff; $('startQrScanner').onclick = startQrScanner; $('stopQrScanner').onclick = stopQrScanner; $('lookupPickupCode').onclick = () => lookupPickupCode($('manualPickupCode').value); $('manualPickupCode').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); lookupPickupCode(e.currentTarget.value) } }; $('closeEditProduct').onclick = () => $('editProductDialog').close(); $('editAddVariant').onclick = () => addEditVariantRow(); $('saveEditProduct').onclick = saveEditProduct; $('deleteProductFromEdit').onclick = deleteProductFromEdit; $('editImage').onchange = e => { const file = e.currentTarget.files?.[0]; if (!file) return; const url = URL.createObjectURL(file); $('editImagePreview').innerHTML = `<img src="${url}" alt="新商品照片預覽">`; }
+  document.querySelectorAll('input[name="method"]').forEach(r => r.onchange = () => { $('deliveryFields').classList.toggle('hidden', !(r.checked && r.value === 'Lalamove配送')) }); $('reservationForm').onsubmit = submitOrder; const adminBtn = $('openAdmin'); if (adminBtn) adminBtn.onclick = openAdminDialog; if (location.hash === '#admin') openAdminDialog(); window.addEventListener('hashchange', () => { if (location.hash === '#admin') openAdminDialog(); }); $('closeAdmin').onclick = () => $('adminDialog').close(); $('closeSuccess').onclick = () => $('successDialog').close(); $('unlockAdmin').onclick = unlock; $('logoutAdmin').onclick = logout; document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab)); $('statusFilter').onchange = renderOrders; $('orderSearch').oninput = renderOrders; $('exportOrders').onclick = exportCSV; $('addProduct').onclick = addProduct; $('addVariant').onclick = () => addVariantRow(); if ($('productStatusFilter')) $('productStatusFilter').onchange = e => { productStatusFilter = e.currentTarget.value; renderProductAdmin(); }; if ($('productSearch')) $('productSearch').oninput = e => { productSearchQuery = e.currentTarget.value.trim(); renderProductAdmin(); }; if ($('clearProductSearch')) $('clearProductSearch').onclick = () => { productSearchQuery = ''; $('productSearch').value = ''; renderProductAdmin(); }; if ($('parseQuickListing')) $('parseQuickListing').onclick = parseQuickListing; if ($('applyQuickListing')) $('applyQuickListing').onclick = applyQuickListing; if ($('clearQuickListing')) $('clearQuickListing').onclick = clearQuickListing; $('saveSettings').onclick = saveSettings; $('saveStaff').onclick = saveStaff; $('startQrScanner').onclick = startQrScanner; $('stopQrScanner').onclick = stopQrScanner; $('lookupPickupCode').onclick = () => lookupPickupCode($('manualPickupCode').value); $('manualPickupCode').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); lookupPickupCode(e.currentTarget.value) } }; $('closeEditProduct').onclick = () => $('editProductDialog').close(); $('editAddVariant').onclick = () => addEditVariantRow(); $('saveEditProduct').onclick = saveEditProduct; $('deleteProductFromEdit').onclick = deleteProductFromEdit; $('editImage').onchange = e => { const file = e.currentTarget.files?.[0]; if (!file) return; const url = URL.createObjectURL(file); $('editImagePreview').innerHTML = `<img src="${url}" alt="新商品照片預覽">`; }
 }
 async function submitOrder(e) {
   e.preventDefault();
@@ -626,12 +626,164 @@ async function addProduct() {
   if (raw === 'hidden' || p.active === false) return { key:'hidden', label:'結單／隱藏', icon:'●', cls:'hidden-status' };
   return { key:'open', label:'開放預約', icon:'●', cls:'open' };
 }
+function normalizeProductText(value = '') {
+  return String(value).toLowerCase().replace(/[\s　｜|、,，。．・()（）\-_/]/g, '');
+}
+function productMatchesSearch(p, query) {
+  if (!query) return true;
+  const q = normalizeProductText(query);
+  const haystack = [p.name, p.description, p.unit, ...getVariants(p).flatMap(v => [v.name, v.unit])].map(normalizeProductText).join(' ');
+  return haystack.includes(q);
+}
 function renderProductAdmin() {
-  const list = products.filter(p => productStatusFilter === 'all' || productAdminStatus(p).key === productStatusFilter);
+  const list = products.filter(p => (productStatusFilter === 'all' || productAdminStatus(p).key === productStatusFilter) && productMatchesSearch(p, productSearchQuery));
+  if ($('productSearchCount')) $('productSearchCount').textContent = productSearchQuery ? `找到 ${list.length} 項` : `共 ${products.length} 項商品`;
   $('productAdminList').innerHTML = list.length ? list.map(p => {
     const vs = getVariants(p), st = productAdminStatus(p);
     return `<article class="admin-product admin-product-${st.cls}"><div class="admin-product-top"><div class="admin-product-main"><div class="admin-product-title-row"><strong>${esc(p.emoji)} ${esc(p.name)}</strong><span class="product-status-chip ${st.cls}">${st.icon} ${st.label}</span></div><div class="order-id">基礎庫存：${p.stock} ${esc(p.unit)}</div><div class="variant-admin-summary">${vs.map(v=>`${esc(v.name)} ${money(v.price)} / ${esc(v.unit)}｜扣 ${v.stock_cost} ${esc(p.unit)}`).join('<br>')}</div></div><button class="secondary" data-edit="${p.id}">編輯商品</button></div></article>`;
-  }).join('') : '<div class="empty">這個狀態目前沒有商品。</div>';
+  }).join('') : `<div class="empty">${productSearchQuery ? '找不到符合關鍵字的商品。' : '這個狀態目前沒有商品。'}</div>`;
+}
+function parseQuickVariantToken(token = '') {
+  const raw = String(token).trim();
+  if (!raw) return null;
+  const m = raw.match(/^(.*?)(?:\s*[/:：$＄]?\s*)(\d+(?:\.\d+)?)\s*元?$/);
+  if (!m || !m[1].trim()) return null;
+  return { name: m[1].trim().replace(/[/:：$＄]+$/g, '').trim(), price: Number(m[2]) };
+}
+function findQuickListingProduct(name) {
+  const target = normalizeProductText(name);
+  if (!target) return null;
+  const exact = products.find(p => normalizeProductText(p.name) === target);
+  if (exact) return exact;
+  const fuzzy = products.filter(p => {
+    const n = normalizeProductText(p.name);
+    return n.includes(target) || target.includes(n);
+  });
+  return fuzzy.length === 1 ? fuzzy[0] : null;
+}
+function parseQuickListingLine(line, lineNo) {
+  const parts = String(line).split(/[｜|]/).map(x => x.trim()).filter(Boolean);
+  if (parts.length < 3) return { lineNo, raw: line, error: '格式需要：品項｜規格價格｜庫存數量' };
+  const name = parts[0];
+  const stockText = parts[parts.length - 1];
+  const stockMatch = stockText.match(/庫存\s*[:：]?\s*(\d+(?:\.\d+)?)/);
+  if (!stockMatch) return { lineNo, raw: line, name, error: '找不到庫存，請寫例如「庫存30」' };
+  const variantText = parts.slice(1, -1).join('、');
+  const parsedVariants = variantText.split(/[、,，\n]+/).map(parseQuickVariantToken).filter(Boolean);
+  if (!parsedVariants.length) return { lineNo, raw: line, name, error: '找不到有效規格與價格' };
+  const product = findQuickListingProduct(name);
+  if (!product) return { lineNo, raw: line, name, stock: Number(stockMatch[1]), parsedVariants, error: '找不到對應的既有商品' };
+  const oldVariants = getVariants(product);
+  const variants = parsedVariants.map((v, idx) => {
+    const same = oldVariants.find(old => normalizeProductText(old.name) === normalizeProductText(v.name));
+    const fallback = same || oldVariants[idx] || null;
+    return {
+      id: fallback?.id || `v${idx + 1}`,
+      name: v.name,
+      price: v.price,
+      unit: fallback?.unit || product.unit || v.name,
+      stock_cost: Math.max(1, Number(fallback?.stock_cost || 1))
+    };
+  });
+  return { lineNo, raw: line, name, stock: Number(stockMatch[1]), productId: product.id, productName: product.name, productUnit: product.unit, variants };
+}
+function parseQuickListing() {
+  const text = $('quickListingText')?.value.trim() || '';
+  if (!text) return alert('請先貼上今天要上架的商品清單。');
+  const lines = text.split(/\n+/).map(x => x.trim()).filter(Boolean);
+  quickListingDraft = lines.map((line, idx) => parseQuickListingLine(line, idx + 1));
+  const ids = quickListingDraft.filter(x => x.productId).map(x => String(x.productId));
+  const duplicateIds = new Set(ids.filter((id, idx) => ids.indexOf(id) !== idx));
+  quickListingDraft.forEach(x => { if (x.productId && duplicateIds.has(String(x.productId))) x.error = '同一商品在清單中重複出現'; });
+  renderQuickListingPreview();
+}
+function renderQuickListingPreview() {
+  const box = $('quickListingPreview');
+  if (!box) return;
+  if (!quickListingDraft.length) { box.innerHTML = ''; $('applyQuickListing')?.classList.add('hidden'); $('clearQuickListing')?.classList.add('hidden'); return; }
+  const valid = quickListingDraft.filter(x => !x.error && x.productId);
+  const invalid = quickListingDraft.filter(x => x.error);
+  const selectedIds = new Set(valid.map(x => String(x.productId)));
+  const hideList = products.filter(p => !selectedIds.has(String(p.id)) && productAdminStatus(p).key !== 'hidden');
+  $('quickListingMessage').innerHTML = `<strong>預覽：</strong> 今天上架 ${valid.length} 項；${hideList.length} 項目前開放／暫停中的商品會改為隱藏。${invalid.length ? `<br><span class="quick-error-text">有 ${invalid.length} 行需要修正，修正前不能套用。</span>` : ''}`;
+  box.innerHTML = quickListingDraft.map((item, idx) => {
+    if (item.error) return `<article class="quick-preview-card quick-preview-error"><div class="quick-preview-head"><strong>第 ${item.lineNo} 行｜${esc(item.name || item.raw)}</strong><span>⚠ ${esc(item.error)}</span></div><div class="helper">${esc(item.raw)}</div></article>`;
+    return `<article class="quick-preview-card" data-quick-item="${idx}">
+      <div class="quick-preview-head"><div><strong>${esc(item.productName)}</strong><div class="helper">找到既有商品｜基礎單位 ${esc(item.productUnit)}</div></div><label class="quick-stock-label">庫存<input type="number" min="0" step="any" data-quick-stock value="${item.stock}"></label></div>
+      <div class="quick-variant-head"><span>規格</span><span>價格</span><span>販售單位</span><span>扣庫存</span></div>
+      <div class="quick-variant-list">${item.variants.map((v, vIdx) => `<div class="quick-variant-row" data-quick-variant="${vIdx}"><input data-qv-name value="${esc(v.name)}"><input data-qv-price type="number" min="0" step="any" value="${v.price}"><input data-qv-unit value="${esc(v.unit)}"><input data-qv-cost type="number" min="1" step="any" value="${v.stock_cost}"></div>`).join('')}</div>
+    </article>`;
+  }).join('') + (hideList.length ? `<details class="quick-hide-details"><summary>查看將隱藏的 ${hideList.length} 項商品</summary><div>${hideList.map(p => `<span>${esc(p.name)}</span>`).join('')}</div></details>` : '');
+  $('applyQuickListing')?.classList.toggle('hidden', invalid.length > 0 || valid.length === 0);
+  $('clearQuickListing')?.classList.remove('hidden');
+}
+function readQuickListingPreview() {
+  return quickListingDraft.filter(x => !x.error && x.productId).map((item, idx) => {
+    const draftIndex = quickListingDraft.indexOf(item);
+    const card = document.querySelector(`[data-quick-item="${draftIndex}"]`);
+    if (!card) throw new Error(`找不到「${item.productName}」的預覽資料`);
+    const variants = [...card.querySelectorAll('[data-quick-variant]')].map((row, vIdx) => ({
+      id: item.variants[vIdx]?.id || `v${vIdx + 1}`,
+      name: row.querySelector('[data-qv-name]').value.trim(),
+      price: Number(row.querySelector('[data-qv-price]').value),
+      unit: row.querySelector('[data-qv-unit]').value.trim(),
+      stock_cost: Math.max(1, Number(row.querySelector('[data-qv-cost]').value) || 1)
+    }));
+    if (variants.some(v => !v.name || !v.unit || !Number.isFinite(v.price) || v.price < 0)) throw new Error(`「${item.productName}」有規格資料未填完整`);
+    return { ...item, stock: Math.max(0, Number(card.querySelector('[data-quick-stock]').value) || 0), variants };
+  });
+}
+async function applyQuickListing() {
+  if (!adminSession) return alert('請先登入後台');
+  if (quickListingDraft.some(x => x.error)) return alert('清單仍有需要修正的項目，請先修改原文字再重新解析。');
+  let items;
+  try { items = readQuickListingPreview(); } catch (err) { return alert(err.message || err); }
+  if (!items.length) return alert('沒有可以套用的商品。');
+  const selectedIds = new Set(items.map(x => String(x.productId)));
+  const toHide = products.filter(p => !selectedIds.has(String(p.id)) && productAdminStatus(p).key !== 'hidden');
+  const previewNames = items.map(x => x.productName).join('、');
+  const ok = confirm(`確定套用今天的上架清單嗎？\n\n上架 ${items.length} 項：${previewNames}\n\n另外會將 ${toHide.length} 項未列入今天清單的商品改為「結單／隱藏」。\n\n商品圖片、說明與圖示不會被修改。`);
+  if (!ok) return;
+  const btn = $('applyQuickListing');
+  btn.disabled = true; btn.textContent = '套用中…';
+  try {
+    if (ONLINE) {
+      for (const item of items) {
+        const patch = { stock: item.stock, variants: item.variants, price: item.variants[0].price, active: true, reservation_status: 'open' };
+        const r = await db.from('products').update(patch).eq('id', item.productId);
+        if (r.error) throw new Error(`${item.productName} 更新失敗：${r.error.message}`);
+      }
+      for (const p of toHide) {
+        const r = await db.from('products').update({ active: false, reservation_status: 'hidden' }).eq('id', p.id);
+        if (r.error) throw new Error(`${p.name} 隱藏失敗：${r.error.message}`);
+      }
+      await refreshAll();
+    } else {
+      items.forEach(item => {
+        const p = products.find(x => String(x.id) === String(item.productId));
+        if (p) Object.assign(p, { stock: item.stock, variants: item.variants, price: item.variants[0].price, active: true, reservation_status: 'open' });
+      });
+      toHide.forEach(p => Object.assign(p, { active: false, reservation_status: 'hidden' }));
+      save(LS.products, products);
+    }
+    clearQuickListing(); renderAdmin(); renderProducts();
+    alert(`今日上架完成：已上架 ${items.length} 項，隱藏 ${toHide.length} 項。`);
+  } catch (err) {
+    console.error(err);
+    if (ONLINE) await refreshAll();
+    renderAdmin();
+    alert('快速上架未完整完成：' + (err.message || err) + '\n\n請重新整理確認商品狀態後再操作。');
+  } finally {
+    btn.disabled = false; btn.textContent = '確認套用今日上架';
+  }
+}
+function clearQuickListing() {
+  quickListingDraft = [];
+  if ($('quickListingText')) $('quickListingText').value = '';
+  if ($('quickListingPreview')) $('quickListingPreview').innerHTML = '';
+  if ($('quickListingMessage')) $('quickListingMessage').textContent = '貼上後先解析預覽，不會直接修改商品。';
+  $('applyQuickListing')?.classList.add('hidden');
+  $('clearQuickListing')?.classList.add('hidden');
 }
 document.addEventListener('click', e => {
   const btn = e.target.closest('[data-edit]');
